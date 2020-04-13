@@ -1674,7 +1674,11 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
   {
     $html .= get_blank_day($weekcol);
   }
-
+//jimmy
+  global $show_today;
+  $datetime = new DateTime();
+  $today = $datetime->format('d');
+  // jimmy -end
   // Get the data.  It's much quicker to do a single SQL query getting all the
   // entries for the interval in one go, rather than doing a query for each day.
   $entries = get_entries_by_room($room,
@@ -1710,7 +1714,15 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
     }
     else
     {
-      $html .= "<td class=\"valid\">\n";
+      //jimmy
+      $td_class = "valid";
+      if ($show_today){
+        if ($d == $today){
+          $td_class = "today";
+        }
+	  }
+      $html .= "<td class=\"$td_class\">\n";
+      // jimmy -end
       $html .= "<div class=\"cell_container\">\n";
 
       $html .= "<div class=\"cell_header\">\n";

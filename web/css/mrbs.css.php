@@ -979,6 +979,9 @@ table.dwm_main {
 .dwm_main#month_main td.invalid {
   background-color: <?php echo $main_table_month_invalid_color ?>;
 }
+.dwm_main#month_main td.today   {
+  background-color: <?php echo $show_today_bgcolor // jimmy, today color?>
+}
 
 .dwm_main#month_main:not(.all_rooms) a {
   height: 100%;

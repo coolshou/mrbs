@@ -1372,3 +1372,7 @@ $default_description = "";
 // you may need to specify the full path to your "hg" executable, e.g.:
 // "c:/Program Files/TortoiseHg/hg.exe"
 $hg_command = "hg";
+
+//jimmy, today color
+$show_today = true;
+$show_today_bgcolor = "#CDE7F7";
