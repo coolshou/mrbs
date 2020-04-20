@@ -1570,8 +1570,10 @@ function get_booking_summary($start, $end, $day_start, $day_end)
   // Use ~ (not -) to separate the start and stop times, because MSIE
   // will incorrectly line break after a -.
   $separator = '~';
-  $after_today = "====&gt;";
-  $before_today = "&lt;====";
+  //$after_today = "====&gt;";
+  $after_today = "====>";  //jimmy
+  //$before_today = "&lt;====";
+  $before_today = "<===="; //jimmy
   $midnight = "24:00";  // need to fix this so it works with AM/PM configurations (and for that matter 24h)
   // Localized "all day" text but with non-breaking spaces:
   $all_day = preg_replace("/ /", "&nbsp;", get_vocab("all_day"));
