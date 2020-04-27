@@ -1679,6 +1679,8 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
 //jimmy
   global $show_today;
   $datetime = new DateTime();
+  $thisyear = $datetime->format('Y');
+  $thismonth = $datetime->format('m');
   $today = $datetime->format('d');
   // jimmy -end
   // Get the data.  It's much quicker to do a single SQL query getting all the
@@ -1719,7 +1721,7 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
       //jimmy
       $td_class = "valid";
       if ($show_today){
-        if ($d == $today){
+        if (($year == $thisyear) and ($month == $thismonth) and ($d == $today)){
           $td_class = "today";
         }
 	  }
