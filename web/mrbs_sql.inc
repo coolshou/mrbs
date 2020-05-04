@@ -2247,3 +2247,30 @@ function get_bookings_in_series($repeat_id)
 
   return $bookings;
 }
+
+function get_holidays($year){
+    /*get holidays of the $year*/
+    //TODO:  get this year's holiday, ID=1 (Taiwan)
+    $holidays = array();
+    //$holiday = array();
+    //$sql = "SELECT Date,Name FROM `mrbs_holiday` WHERE YEAR(Date) = YEAR(CURDATE()) ";
+    $sql = "SELECT Date,Name FROM `mrbs_holiday` WHERE YEAR(Date) = $year";
+    $res = db()->query($sql);
+    while (false !== ($row = $res->next_row_keyed()))
+    {
+        //$holiday['Date'] = $row['Date'];
+        //$holiday['Name'] = $row['Name'];
+        //echo "date: $row['Date'] <br/>";
+        array_push($holidays, $row['Date'].",".$row['Name']);
+        //array_push($holidays, $holiday);
+    }
+    /*
+    foreach ($holidays as $value)
+        {
+            //echo "$value ";
+            foreach ($arr as $key => $value){
+                echo("$key : $value <br>");
+            }
+        }*/
+    return $holidays;
+}

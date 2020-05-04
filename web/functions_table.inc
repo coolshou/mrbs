@@ -1566,7 +1566,6 @@ function get_blank_day($col)
 function get_booking_summary($start, $end, $day_start, $day_end)
 {
   global $enable_periods, $area;
-
   // Use ~ (not -) to separate the start and stop times, because MSIE
   // will incorrectly line break after a -.
   $separator = '~';
@@ -1677,6 +1676,9 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
     $html .= get_blank_day($weekcol);
   }
 //jimmy
+  global $show_holiday ;
+  $holidays = get_holidays($year);
+
   global $show_today;
   $datetime = new DateTime();
   $thisyear = $datetime->format('Y');
@@ -1750,7 +1752,22 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
       $vars['view'] = 'day';
       $query = http_build_query($vars, '', '&');
       $html .= '<a class="monthday" href="index.php?' . htmlspecialchars($query) . "\">$d</a>\n";
-
+      //jimmy
+      if ($show_holiday){
+          $search_text = date("Y-m-d", strtotime($year."-".$month."-".$d));
+          $hidx = False;
+          foreach ($holidays as $value){
+              $hidx = stripos($value, $search_text);
+             if($hidx !== False){
+                 $hdays = explode(",", $value);
+                break;
+            }
+          }
+          if  ($hidx !== False) {
+            $html .= "<spen class=\"holiday\">$hdays[1]</spen>\n";
+          }
+      }
+      // jimmy, end show_holiday
       $html .= "</div>\n";
 
       // then the link to make a new booking
@@ -1775,7 +1792,6 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
         $html .= "<img src=\"images/new.gif\" alt=\"New\" width=\"10\" height=\"10\">\n";
       }
       $html .= "</a>\n";
-
       // then any bookings for the day
       $html .= "<div class=\"booking_list\">\n";
       // Show the start/stop times, 1 or 2 per line, linked to view_entry.
