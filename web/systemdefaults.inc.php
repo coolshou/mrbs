@@ -1376,3 +1376,5 @@ $hg_command = "hg";
 //jimmy, today color
 $show_today = true;
 $show_today_bgcolor = "#CDE7F7";
+$show_holiday = false;
+$show_holiday_bgcolor  = "#ADD8E6";

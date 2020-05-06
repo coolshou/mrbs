@@ -1722,7 +1722,20 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
     {
       //jimmy
       $td_class = "valid";
-      if ($show_today){
+      if ($show_holiday){
+          $search_text = date("Y-m-d", strtotime($year."-".$month."-".$d));
+          $hidx = False;
+          foreach ($holidays as $value){
+              $hidx = stripos($value, $search_text);
+             if($hidx !== False){
+                 $hdays = explode(",", $value);
+                break;
+            }
+          }
+        if  ($hidx !== False) {
+            $td_class = "holiday";
+        }
+      }else if ($show_today){
         if (($year == $thisyear) and ($month == $thismonth) and ($d == $today)){
           $td_class = "today";
         }
@@ -1754,15 +1767,6 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
       $html .= '<a class="monthday" href="index.php?' . htmlspecialchars($query) . "\">$d</a>\n";
       //jimmy
       if ($show_holiday){
-          $search_text = date("Y-m-d", strtotime($year."-".$month."-".$d));
-          $hidx = False;
-          foreach ($holidays as $value){
-              $hidx = stripos($value, $search_text);
-             if($hidx !== False){
-                 $hdays = explode(",", $value);
-                break;
-            }
-          }
           if  ($hidx !== False) {
             $html .= "<spen class=\"holiday\">$hdays[1]</spen>\n";
           }
