@@ -1566,6 +1566,7 @@ function get_blank_day($col)
 function get_booking_summary($start, $end, $day_start, $day_end)
 {
   global $enable_periods, $area;
+
   // Use ~ (not -) to separate the start and stop times, because MSIE
   // will incorrectly line break after a -.
   $separator = '~';
@@ -1735,7 +1736,8 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
         if  ($hidx !== False) {
             $td_class = "holiday";
         }
-      }else if ($show_today){
+      }
+      if ($show_today){
         if (($year == $thisyear) and ($month == $thismonth) and ($d == $today)){
           $td_class = "today";
         }
@@ -1796,6 +1798,7 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
         $html .= "<img src=\"images/new.gif\" alt=\"New\" width=\"10\" height=\"10\">\n";
       }
       $html .= "</a>\n";
+
       // then any bookings for the day
       $html .= "<div class=\"booking_list\">\n";
       // Show the start/stop times, 1 or 2 per line, linked to view_entry.
