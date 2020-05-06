@@ -1377,4 +1377,4 @@ $hg_command = "hg";
 $show_today = true;
 $show_today_bgcolor = "#CDE7F7";
 $show_holiday = false;
-$show_holiday_bgcolor  = "#ADD8E6";
+$show_holiday_bgcolor  = "#D3EDD3";
