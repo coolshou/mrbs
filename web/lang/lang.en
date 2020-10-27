@@ -545,3 +545,8 @@ $vocab["browser_not_supported"] = "Unfortunately your browser isn't supported by
                                   "recent version, or else use another browser.";
 $vocab["back"]               = "Back";
 
+// Used in holiday.php
+$vocab["import_holiday"]            = "Import an holiday file";
+$vocab["import_holiday_intro"]                = "This form allows you to import an holiday file into MRBS";
+$vocab["import_holiday_text_file"]            = "uncompressed csv files (each line: yyyy/mm/dd, description)";
+$vocab["holiday_location_settings"]          = "Country or Location";
