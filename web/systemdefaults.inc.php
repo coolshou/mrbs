@@ -103,6 +103,13 @@ $db_persist = false;
 /*********************************
  * Site identification information
  *********************************/
+
+// Set to true to enable multisite operation, in which case the settings below are for the
+// home site, identified by the empty string ''.   Other sites have their own supplementary
+// config fies in the sites/<sitename> directory.
+$multisite = false;
+$default_site = '';
+
 $mrbs_admin = "Your Administrator";
 $mrbs_admin_email = "admin_email@your.org";
 // NOTE:  there are more email addresses in $mail_settings below.    You can also give
@@ -209,7 +216,7 @@ $theme = "default";
 
 // The settings below are global policy settings
 
-// Set the maximum number of bookings that can be made by any one user, in an interval,
+// Set the maximum *number* of bookings that can be made by any one user, in an interval,
 // which can be a day, week, month or year, or else in the future.  (A week is defined
 // by the $weekstarts setting).   These are global settings, but you can additionally
 // configure per area settings.   This would allow you to set policies such as allowing
@@ -228,6 +235,28 @@ $max_per_interval_global['year'] = 50;    // max 50 bookings per year in total
 
 $max_per_interval_global_enabled['future'] = false;
 $max_per_interval_global['future'] = 100; // max 100 bookings in the future in total
+
+// Set the maximum total *length* of bookings that can be made by any one user, in an interval,
+// which can be a day, week, month or year, or else in the future.  (A week is defined
+// by the $weekstarts setting).   These are global settings, but you can additionally
+// configure per area settings.   This would allow you to set policies such as allowing a
+// maximum of 10 hours per week in total with a maximum of 1 hour per day in Area A.
+// These settings only apply to areas in "times" mode.
+
+$max_secs_per_interval_global_enabled['day']    = false;
+$max_secs_per_interval_global['day'] = 60*60*2;      // max 2 hours per day in total
+
+$max_secs_per_interval_global_enabled['week']   = false;
+$max_secs_per_interval_global['week'] = 60*60*10;    // max 10 hours per week in total
+
+$max_secs_per_interval_global_enabled['month']  = false;
+$max_secs_per_interval_global['month'] = 60*60*25;   // max 25 hours per month in total
+
+$max_secs_per_interval_global_enabled['year']   = false;
+$max_secs_per_interval_global['year'] = 60*60*100;   // max 100 hours per year in total
+
+$max_secs_per_interval_global_enabled['future'] = false;
+$max_secs_per_interval_global['future'] = 60*60*100; // max 100 hours in the future in total
 
 // Set the latest date for which you can make a booking.    This can be useful if you
 // want to set an absolute date, eg the end of term, beyond which bookings cannot be made.
@@ -253,6 +282,13 @@ $min_booking_date = "2012-04-23";  // Must be a string in the format "yyyy-mm-dd
 // min and max delete ahead settings.
 $approved_bookings_cannot_be_changed = false;
 
+// Set this to true if you want to prevent users having a booking for two different rooms
+// at the same time.
+$prevent_simultaneous_bookings = false;
+
+// Set this to true if you want to prevent bookings of a type that is invalid for a room
+$prevent_invalid_types = true;
+
 /******************
  * Display settings
  ******************/
@@ -273,10 +309,6 @@ $weekdays = array(1, 2, 3, 4, 5);
 // By default the hidden days will be removed completely from the main table in the week and month
 // views.   You can alternatively arrange for them to be shown as narrow, greyed-out columns
 // by defining some custom CSS for the .hidden_day class.
-//
-// [Note that although they are hidden from display in the week and month views, they
-// can still be booked from the edit_entry form and you can display the bookings by
-// jumping straight into the day view from the date selector.]
 $hidden_days = array();
 
 // Time format in pages. FALSE to show dates in 12 hour format, TRUE to show them
@@ -339,7 +371,7 @@ $ajax_refresh_rate = 10;
 // Refresh rate for page pre-fetches in the calendar views.   MRBS tries to improve
 // performance of navigation between pages in the calendar view by pre-fetching some
 // pages.   This setting determines how often (in seconds) the pre-fetches should be
-// refreshed in order to keep them from gettin out of date.  Set to 0 to disable.
+// refreshed in order to keep them from getting out of date.  Set to 0 to disable.
 $prefetch_refresh_rate = 30;
 
 // Entries in monthly view can be shown as start/end slot, brief description or
@@ -352,8 +384,13 @@ $monthly_view_entries_details = "both";
 $view_week_number = false;
 
 // Whether or not the mini-calendars are displayed.  (Note that mini-calendars are only
-// displayed anyway if the screen is wide enough.)
+// displayed anyway if the window is wide enough.)
 $display_mincals = true;
+
+// If the window is too narrow the mini-calendars are normally not displayed.  However by
+// setting the following variable to true they will be displayed above the main calendar,
+// provided the window is high enough.
+$display_mincals_above = false;
 
 // To display week numbers in the mini-calendars, set this to true. The week
 // numbers are only accurate if you set $weekstarts to 1, i.e. set the
@@ -363,12 +400,6 @@ $mincals_week_numbers = false;
 // To display the endtime in the slot description, eg '09:00-09:30' instead of '09:00', set
 // this to true.
 $show_slot_endtime = false;
-
-// In the day view, to display times on the x-axis (along the top) and rooms on the y-axis (down
-// the side set to true; the default/traditional version of MRBS has rooms along the top and
-// times down the side.    Transposing the table can be useful if you have a large number of
-// rooms and not many time slots.
-$times_along_top = false;
 
 // To display the row labels (times, rooms or days) on the right hand side as well as the
 // left hand side in the day and week views, set to true;
@@ -411,9 +442,7 @@ $clipped_month = true;
 
 // Set to true if you want the cells in the month view to scroll if there are too
 // many bookings to display; set to false if you want the table cell to expand to
-// accommodate the bookings.   (NOTE: (1) scrolling doesn't work in IE6 and so the table
-// cell will always expand in IE6.  (2) In IE8 Beta 2 scrolling doesn't work either and
-// the cell content is clipped when $month_cell_scrolling is set to true.)
+// accommodate the bookings.
 $month_cell_scrolling = true;
 
 // Define the maximum length of a string that can be displayed in an admin table cell
@@ -448,6 +477,9 @@ $pdf_default_orientation = 'portrait';
 // The default paper size for PDF output
 // Options: 'A3', 'A4', 'A5', 'LEGAL', 'LETTER' or 'TABLOID'
 $pdf_default_paper = 'A4';
+
+// Whether to sort users by their last names or not
+$sort_users_by_last_name = false;
 
 /************************
  * Miscellaneous settings
@@ -582,6 +614,12 @@ $is_mandatory_field = array();
 // $is_mandatory_field['entry.type'] = true;
 // $is_mandatory_field['entry.terms_and_conditions'] = true;
 
+$is_mandatory_field['users.display_name'] = true;
+
+// Set this to false if you do not want to have the ability to create events for which
+// other people can register.
+$enable_registration = true;
+
 // Set $skip_default to true if you want the "Skip past conflicts" box
 // on the edit_entry form to be checked by default.  (This will mean that
 // if you make a repeat booking and some of the repeat dates are already
@@ -622,9 +660,9 @@ $report_presentation_field_order = array();
 // then you must use the corresponding session scheme.
 
 $auth["type"] = "db"; // How to validate the user/password. One of
-                      // "auth_basic", "cas", "config", "crypt", "db", "db_ext", "imap",
-                      // "imap_php",  "joomla", "ldap", "nis", "none", "nw", "pop3",
-                      // "saml", "smtp" or "wordpress".
+                      // "auth_basic", "cas", "config", "crypt", "db", "db_ext", "idcheck",
+                      // "imap", "imap_php", "joomla", "ldap", "none", "nw", "pop3",
+                      // "saml" or "wordpress".
 
 $auth["session"] = "php"; // How to get and keep the user ID. One of
                           // "cas", "cookie", "host", "http", "ip", "joomla", "nt",
@@ -762,8 +800,11 @@ $auth['cas']['debug']   = false;  // Set to true to enable debug output. Disable
 // 'auth_db' configuration settings
 // List of fields which only admins can edit.   By default these are the
 // user level (ie admin/user) and the username.   Custom fields can be added
-// as required.
-$auth['db']['protected_fields'] = array('level', 'name');
+// as required.  To protect the password field use 'password_hash' - useful
+// for public demo sites.
+$auth['db']['protected_fields'] = array('level', 'name', 'display_name');
+// Expiry time for a password reset key
+$auth['db']['reset_key_expiry'] = 60*60*24; // seconds
 
 
 // 'auth_db_ext' configuration settings
@@ -784,11 +825,12 @@ $auth['db_ext']['db_password'] = 'authpass';
 $auth['db_ext']['db_name'] = 'authdb';
 $auth['db_ext']['db_table'] = 'users';
 $auth['db_ext']['column_name_username'] = 'name';
+$auth['db_ext']['column_name_display_name'] = 'display_name';  // optional
 $auth['db_ext']['column_name_password'] = 'password';
 $auth['db_ext']['column_name_email'] = 'email';
 // Below is an example if you want to put the MRBS user level in the DB
 //$auth['db_ext']['column_name_level'] = 'mrbs_level';
-// Either 'password_hash' (from PHP 5.5.0), 'md5', 'sha1', 'crypt' or 'plaintext'
+// Either 'password_hash' (from PHP 5.5.0), 'md5', 'sha1', 'sha256', 'crypt' or 'plaintext'
 $auth['db_ext']['password_format'] = 'md5';
 
 // 'auth_ldap' configuration settings
@@ -963,6 +1005,22 @@ $auth['joomla']['admin_access_levels'] = array(); // Can either be a single inte
 $auth['joomla']['user_access_levels'] = array(); // Can either be a single integer, or an array of integers.
 
 
+// 'auth_saml' configuration settings
+// (assuming Active Directory attributes):
+$auth['saml']['ssp_path'] = '/opt/simplesamlphp';  // must be an absolute and not a relative path
+$auth['saml']['authsource'] = 'default-sp';
+$auth['saml']['attr']['username'] = 'sAMAccountName';
+$auth['saml']['attr']['mail'] = 'mail';
+$auth['saml']['admin']['memberOf'] = ['CN=Domain Admins,CN=Users,DC=example,DC=com'];
+
+// This scheme assumes that you've already configured SimpleSamlPhp,
+// and that you have set up aliases in your webserver so that SimpleSamlPhp
+// can handle incoming assertions.  Refer to the SimpleSamlPhp documentation
+// for more information on how to do that.
+//
+// https://simplesamlphp.org/docs/stable/simplesamlphp-install
+// https://simplesamlphp.org/docs/stable/simplesamlphp-sp
+
 
 // 'auth_wordpress' configuration settings
 $auth['wordpress']['rel_path'] = '..';   // Path to the WordPress installation relative to MRBS.
@@ -1005,6 +1063,7 @@ define('COOKIEHASH', md5($domain_name));
 // the authentication type supports validation by local-part).   For example, if user
 // with username 'john' has email address 'jsmith@example.com', then he would be able
 // to enter either 'john', 'jsmith' or 'jsmith@example.com' when logging in.
+// Only supported for the 'db' authentication type.
 $auth['allow_local_part_email'] = false;
 
 // If you want only administrators to be able to make and delete bookings,
@@ -1028,9 +1087,16 @@ $auth['only_admin_can_select_multiroom'] = false;
 // details then set this to true.  (Only relevant when using 'db' authentication]
 $auth['only_admin_can_see_other_users'] = false;
 
+// For events that allow registration, the other registrants' names are by default
+// not shown unless you have write access to the booking.
+$auth['show_registrant_names'] = false;
+
 // Set this to true if you don't want admins to be able to make bookings
 // on behalf of other users
 $auth['admin_can_only_book_for_self'] = false;
+
+// An array of booking types for admin use only
+$auth['admin_only_types'] = array();  // eg array('E');
 
 // If you want to prevent the public (ie un-logged in users) from
 // being able to view bookings, set this variable to true
@@ -1054,7 +1120,7 @@ $allow_cli = false;
 
 // Set to true if you want usernames and passwords submitted in the login form to be
 // recorded in the error log as part of the $_POST variable.  Otherwise they are
-// replaced by '****'.
+// replaced by '****', unless they are the empty string ''.
 $auth['log_credentials'] = false;
 
 
@@ -1231,6 +1297,14 @@ $smtp_settings['ssl_allow_self_signed'] = false;
 // extension '.ics'
 $mail_settings['ics_filename'] = "booking";
 
+// The rate at which emails can be sent out can be throttled if necessary in order to help
+// keep within a mail server's limits.  Note that the throttle only applies to emails being
+// sent by one user.  If another user is generating email notifications at the same time
+// then these won't be taken into account.   Note also that if the email is going to n
+// different addresses then this counts as n emails, as that is how most servers operate.
+// A setting of zero disables throttling.
+$mail_settings['rate_limit'] = 0;  // emails per second (float or int)
+
 // Set this to true if you want MRBS to output debug information when you are sending email.
 // If you are not getting emails it can be helpful by telling you (a) whether the mail functions
 // are being called in the first place (b) whether there are addresses to send email to and (c)
@@ -1356,10 +1430,6 @@ $booking_types[] = "I";
 // still have a type associated with it in the database, which will be the default type.)
 // unset($booking_types);
 
-// Default type for new bookings
-// (Note that the default type does not apply if the type field is mandatory)
-$default_type = "I";
-
 // Default short description for new bookings
 $default_name = "";
 
@@ -1372,9 +1442,3 @@ $default_description = "";
 // you may need to specify the full path to your "hg" executable, e.g.:
 // "c:/Program Files/TortoiseHg/hg.exe"
 $hg_command = "hg";
-
-//jimmy, today color
-$show_today = true;
-$show_today_bgcolor = "#CDE7F7";
-$show_holiday = false;
-$show_holiday_bgcolor  = "#D3EDD3";

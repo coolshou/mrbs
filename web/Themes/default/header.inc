@@ -9,6 +9,8 @@ use MRBS\Form\ElementInputSubmit;
 
 function print_head($simple=false)
 {
+  global $refresh_rate;
+  
   echo "<head>\n";
 
   echo "<meta charset=\"" . get_charset() . "\">\n";
@@ -31,13 +33,25 @@ function print_head($simple=false)
     echo "<meta name=\"csrf_token\" content=\"" . htmlspecialchars(Form::getToken()) . "\">\n";
   }
 
+  echo "<meta name=\"robots\" content=\"noindex, nofollow, noarchive\">\n";
+
+  if (($refresh_rate != 0) && (this_page(false, '.php') == 'index'))
+  {
+    // If we're using JavaScript we'll do the refresh by getting a new
+    // table using Ajax requests, which means we only have to download
+    // the table not the whole page each time
+    echo "<noscript>\n";
+    echo "<meta http-equiv=\"Refresh\" content=\"$refresh_rate\">\n";
+    echo "</noscript>\n";
+  }
+
   echo "<title>" . get_vocab("mrbs") . "</title>\n";
 
-  require_once "style.inc";
+  require_once MRBS_ROOT . "/style.inc";
 
   if (!$simple)
   {
-    require_once "js.inc";
+    require_once MRBS_ROOT . "/js.inc";
   }
 
   echo "</head>\n";
@@ -97,35 +111,49 @@ function print_header_site_info()
   {
     echo '<span id="more_info">' . htmlspecialchars($mrbs_company_more_info) . "</span>\n";
   }
-  echo '<a href="index.php">' . get_vocab('mrbs') . "</a>\n";
+  echo '<a href="' . htmlspecialchars(multisite('index.php')) . '">' . get_vocab('mrbs') . "</a>\n";
   echo "</div>\n";
 }
 
 
-function print_goto_date($view, $year, $month, $day, $area, $room)
+function print_goto_date($context)
 {
+  global $multisite, $site;
+
+  if (!checkAuthorised('index.php', true))
+  {
+    // Don't show the goto box if the user isn't allowed to view the calendar
+    return;
+  }
+
   $form = new Form();
 
   $form_id = 'form_nav';
 
   $form->setAttributes(array('id'     => $form_id,
+                             'class'  => 'js_hidden',
                              'method' => 'get',
-                             'action' => 'index.php'))
-       ->addHiddenInput('view', $view);
+                             'action' => multisite('index.php')))
+       ->addHiddenInput('view', $context['view']);
 
-  if (isset($area))
+  if (isset($context['area']))
   {
-    $form->addHiddenInput('area', $area);
+    $form->addHiddenInput('area', $context['area']);
   }
 
   if (isset($room))
   {
-    $form->addHiddenInput('room', $room);
+    $form->addHiddenInput('room', $context['room']);
+  }
+
+  if ($multisite && isset($site) && ($site !== ''))
+  {
+    $form->addHiddenInput('site', $site);
   }
 
   $input = new ElementInputDate();
   $input->setAttributes(array('name'        => 'page_date',
-                              'value'       => format_iso_date($year, $month, $day),
+                              'value'       => format_iso_date($context['year'], $context['month'], $context['day']),
                               'required'    => true,
                               'data-submit' => $form_id));
 
@@ -141,9 +169,9 @@ function print_goto_date($view, $year, $month, $day, $area, $room)
 
 function print_outstanding($query)
 {
-  $user = getUserName();
+  $mrbs_user = session()->getCurrentUser();
 
-  if (!isset($user))
+  if (!isset($mrbs_user))
   {
     return;
   }
@@ -151,9 +179,9 @@ function print_outstanding($query)
   // Provide a link to the list of bookings awaiting approval
   // (if there are any enabled areas where we require bookings to be approved)
   $approval_somewhere = some_area('approval_enabled', TRUE);
-  if ($approval_somewhere && (authGetUserLevel($user) >= 1))
+  if ($approval_somewhere && ($mrbs_user->level > 0))
   {
-    $n_outstanding = get_entries_n_outstanding($user);
+    $n_outstanding = get_entries_n_outstanding($mrbs_user);
 
     $class = 'notification';
 
@@ -162,7 +190,7 @@ function print_outstanding($query)
       $class .= ' attention';
     }
 
-    echo '<a href="pending.php?' . htmlspecialchars($query) . '"' .
+    echo '<a href="' . htmlspecialchars(multisite("pending.php?$query")) . '"' .
          " class=\"$class\"" .
          ' title="' . get_vocab('outstanding', $n_outstanding) .
          "\">$n_outstanding</a>\n";
@@ -183,25 +211,20 @@ function print_menu_items($query)
   {
     $menu_items['user_list'] = 'edit_users.php';
   }
-  //jimmy
-  global $show_holiday;
-  if  ($show_holiday){
-    $menu_items['holiday'] = 'holiday.php';
-  }
-  // jimmy end
+
   foreach ($menu_items as $token => $page)
   {
     // Only print menu items for which the user is allowed to access the page
     if (checkAuthorised($page, true))
     {
-      echo '<a href="' . htmlspecialchars("$page?$query") . '">' . get_vocab($token) . "</a>\n";
+      echo '<a href="' . htmlspecialchars(multisite("$page?$query")) . '">' . get_vocab($token) . "</a>\n";
     }
   }
 }
 
 
 
-function print_search($view, $year, $month, $day, $area, $room)
+function print_search($context)
 {
   if (!checkAuthorised('search.php', true))
   {
@@ -215,18 +238,18 @@ function print_search($view, $year, $month, $day, $area, $room)
 
   $form->setAttributes(array('id'     => 'header_search',
                              'method' => 'post',
-                             'action' => 'search.php'))
-       ->addHiddenInputs(array('view'  => $view,
-                               'year'  => $year,
-                               'month' => $month,
-                               'day'   => $day));
-  if (!empty($area))
+                             'action' => multisite('search.php')))
+       ->addHiddenInputs(array('view'  => $context['view'],
+                               'year'  => $context['year'],
+                               'month' => $context['month'],
+                               'day'   => $context['day']));
+  if (!empty($context['area']))
   {
-    $form->addHiddenInput('area', $area);
+    $form->addHiddenInput('area', $context['area']);
   }
-  if (!empty($room))
+  if (!empty($context['room']))
   {
-    $form->addHiddenInput('room', $room);
+    $form->addHiddenInput('room', $context['room']);
   }
 
   $input = new ElementInputSearch();
@@ -250,27 +273,128 @@ function print_search($view, $year, $month, $day, $area, $room)
 }
 
 
-function print_banner($view, $year, $month, $day, $area, $room, $simple=false)
+// Generate the username link, which gives a report on the user's upcoming bookings.
+function print_report_link(User $user)
+{
+  // If possible, provide a link to the Report page, otherwise the Search page
+  // and if that's not possible just print the username with no link.  (Note that
+  // the Search page isn't the perfect solution because it searches for any bookings
+  // containing the search string, not just those created by the user.)
+  if (checkAuthorised('report.php', true))
+  {
+    $attributes = array('action' => multisite('report.php'));
+    $hidden_inputs = array('phase'        => '2',
+                           'creatormatch' => $user->username);
+  }
+  elseif (checkAuthorised('search.php', true))
+  {
+    $attributes = array('action' => multisite('search.php'));
+    $hidden_inputs = array('search_str' => $user->username);
+  }
+  else
+  {
+    echo '<span>' . htmlspecialchars($user->display_name) . '</span>';
+    return;
+  }
+
+  // We're authorised for either Report or Search so print the form.
+  $form = new Form();
+
+  $attributes['id'] = 'show_my_entries';
+  $attributes['method'] = 'post';
+  $form->setAttributes($attributes)
+       ->addHiddenInputs($hidden_inputs);
+
+  $submit = new ElementInputSubmit();
+  $submit->setAttributes(array('title' => get_vocab('show_my_entries'),
+                               'value' => $user->display_name));
+  $form->addElement($submit);
+
+  $form->render();
+}
+
+
+function print_logonoff_button($params, $value)
+{
+  $form = new Form();
+  $form->setAttributes(array('method' => $params['method'],
+                             'action' => $params['action']));
+
+  // A Get method will replace the query string in the action URL with a query
+  // string made up of the hidden inputs.  So put any parameters in the action
+  // query string into hidden inputs.
+  if (utf8_strtolower($params['method']) == 'get')
+  {
+    $query_string = parse_url($params['action'], PHP_URL_QUERY);
+    if (isset($query_string))
+    {
+      parse_str($query_string, $query_parameters);
+      $form->addHiddenInputs($query_parameters);
+    }
+  }
+
+  // Add the hidden fields
+  if (isset($params['hidden_inputs']))
+  {
+    $form->addHiddenInputs($params['hidden_inputs']);
+  }
+
+  // The submit button
+  $element = new ElementInputSubmit();
+  $element->setAttribute('value', $value);
+  $form->addElement($element);
+
+  $form->render();
+}
+
+
+function print_logon()
+{
+  if (method_exists(session(), 'getLogonFormParams'))
+  {
+    $form_params = session()->getLogonFormParams();
+    if (isset($form_params))
+    {
+      print_logonoff_button($form_params, get_vocab('login'));
+    }
+  }
+}
+
+
+function print_logoff()
+{
+  if (method_exists(session(), 'getLogoffFormParams'))
+  {
+    $form_params = session()->getLogoffFormParams();
+    if (isset($form_params))
+    {
+      print_logonoff_button($form_params, get_vocab('logoff'));
+    }
+  }
+}
+
+// $context is an associative array indexed by 'view', 'view_all', 'year', 'month', 'day', 'area' and 'room',
+// all of which have to be set.
+// When $omit_login is true the Login link is omitted.
+function print_banner($context, $simple=false, $omit_login=false)
 {
   echo '<header class="banner' . (($simple) ? ' simple' : '') . "\">\n";
 
-  $vars = array('view'  => $view,
-                'page_date' => format_iso_date($year, $month, $day));
+  $vars = array('view'  => $context['view'],
+                'page_date' => format_iso_date($context['year'], $context['month'], $context['day']));
 
-  if (!empty($area))
+  if (!empty($context['area']))
   {
-    $vars['area'] = $area;
+    $vars['area'] = $context['area'];
   }
-  if (!empty($room))
+  if (!empty($context['room']))
   {
-    $vars['room'] = $room;
+    $vars['room'] = $context['room'];
   }
 
   $query = http_build_query($vars, '', '&');
 
   print_header_site_info();
-
-
 
   if (!$simple)
   {
@@ -284,29 +408,26 @@ function print_banner($view, $year, $month, $day, $area, $room, $simple=false)
 
     echo "<nav class=\"logon\">\n";
     print_outstanding($query);
-    // For session protocols that define their own logon box...
-    // (Note: This really needs to be sorted out so that the HTML
-    // is taken out of the session code)
-    if (function_exists(__NAMESPACE__ . "\\print_logon_box"))
+
+    $mrbs_user = session()->getCurrentUser();
+
+    if (isset($mrbs_user))
     {
-      print_logon_box();
+      print_report_link($mrbs_user);
+      print_logoff();
     }
-    else
+    elseif (!$omit_login)
     {
-      $user = getUserName();
-      if (isset($user))
-      {
-        require_once MRBS_ROOT . '/session/functions_session.inc';
-        print_report_link($user);
-      }
+      print_logon();
     }
+
     echo "</nav>\n";
 
     echo "</nav>\n";
 
     echo "<nav>\n";
-    print_goto_date($view, $year, $month, $day, $area, $room);
-    print_search($view, $year, $month, $day, $area, $room);
+    print_goto_date($context);
+    print_search($context);
     echo "</nav>\n";
 
     echo "</nav>\n";
@@ -319,10 +440,10 @@ function print_banner($view, $year, $month, $day, $area, $room, $simple=false)
 
 // Print a message which will only be displayed (thanks to CSS) if the user is
 // using an unsupported browser.
-function print_unsupported_message()
+function print_unsupported_message($context)
 {
   echo "<div class=\"unsupported_message\">\n";
-  print_banner(null, null, null, null, null, null, $simple=true);
+  print_banner($context, $simple=true);
   echo "<div class=\"contents\">\n";
   echo "<p>" . get_vocab('browser_not_supported', get_vocab('mrbs_abbr')) . "</p>\n";
   echo "</div>\n";
@@ -331,10 +452,67 @@ function print_unsupported_message()
 
 
 // Print the page header
+// $context is an associative array indexed by 'view', 'view_all', 'year', 'month', 'day', 'area' and 'room',
+// any of which can be NULL.
 // If $simple is true, then just print a simple header that doesn't require any database
 // access or JavaScript (useful for fatal errors and database upgrades).
-function print_theme_header($view, $view_all, $year, $month, $day, $area, $room, $simple=false)
+// When $omit_login is true the Login link is omitted.
+function print_theme_header($context=null, $simple=false, $omit_login=false)
 {
+  global $multisite, $site, $default_view, $default_view_all;
+
+  // Set the context values if they haven't been given
+  if (!isset($context))
+  {
+    $context = array();
+  }
+
+  if (empty($context['area']))
+  {
+    $context['area'] = get_default_area();
+  }
+
+  if (empty($context['room']))
+  {
+    $context['room'] = get_default_room($context['area']);
+  }
+
+  if (!isset($context['view']))
+  {
+    $context['view'] = (isset($default_view)) ? $default_view : 'day';
+  }
+
+  if (!isset($context['view_all']))
+  {
+    $context['view_all'] = (isset($default_view_all)) ? $default_view_all : true;
+  }
+
+  // Need to set the timezone before we can use date()
+  if ($simple)
+  {
+    // We don't really care what timezone is being used
+    mrbs_default_timezone_set();
+  }
+  else
+  {
+    // This will set the correct timezone for the area
+    get_area_settings($context['area']);
+  }
+
+  // If we dont know the right date then use today's
+  if (!isset($context['year']))
+  {
+    $context['year'] = date('Y');
+  }
+  if (!isset($context['month']))
+  {
+    $context['month'] = date('m');
+  }
+  if (!isset($context['day']))
+  {
+    $context['day'] = date('d');
+  }
+
   // Get the form token now, before any headers are sent, in case we are using the 'cookie'
   // session scheme.  Otherwise we won't be able to store the Form token.
   Form::getToken();
@@ -342,7 +520,7 @@ function print_theme_header($view, $view_all, $year, $month, $day, $area, $room,
   $headers = array("Content-Type: text/html; charset=" . get_charset());
   http_headers($headers);
 
-  echo DOCTYPE . "\n";;
+  echo DOCTYPE . "\n";
 
   // We produce two <html> tags: one for versions of IE that we don't support and one for all
   // other browsers.  This enables us to use CSS to hide and show the appropriate text.
@@ -360,14 +538,21 @@ function print_theme_header($view, $view_all, $year, $month, $day, $area, $room,
   // Put some data attributes in the body element for the benefit of JavaScript.  Note that we
   // cannot use these PHP variables directly in the JavaScript files as those files are cached.
   $data = array(
-      'view'      => $view,
-      'view_all'  => $view_all,
-      'area'      => $area,
-      'room'      => $room,
-      'page'      => $page,
-      'page-date' => format_iso_date($year, $month, $day),
-      'is-admin'  => (is_admin()) ? 'true' : 'false'
+      'view'          => $context['view'],
+      'view_all'      => $context['view_all'],
+      'area'          => $context['area'],
+      'room'          => $context['room'],
+      'page'          => $page,
+      'page-date'     => format_iso_date($context['year'], $context['month'], $context['day']),
+      'is-admin'      => (is_admin()) ? 'true' : 'false',
+      'is-book-admin' => (is_book_admin()) ? 'true' : 'false',
+      'lang-prefs'    => json_encode(get_lang_preferences())
     );
+
+  if ($multisite && isset($site) && ($site !== ''))
+  {
+    $data['site'] = $site;
+  }
 
   // We need $timetohighlight for the day and week views
   $timetohighlight = get_form_var('timetohighlight', 'int');
@@ -379,8 +564,8 @@ function print_theme_header($view, $view_all, $year, $month, $day, $area, $room,
   // Put the filename in as a class to aid styling.
   $classes = array($page);
   // And if the user is logged in, add another class to aid styling
-  $user = getUserName();
-  if (isset($user))
+  $mrbs_user = session()->getCurrentUser();
+  if (isset($mrbs_user))
   {
     $classes[] = 'logged_in';
   }
@@ -395,11 +580,9 @@ function print_theme_header($view, $view_all, $year, $month, $day, $area, $room,
   }
   echo ">\n";
 
+  print_unsupported_message($context);
 
-
-  print_unsupported_message();
-
-  print_banner($view, $year, $month, $day, $area, $room, $simple);
+  print_banner($context, $simple, $omit_login);
 
   // This <div> should really be moved out of here so that we can always see
   // the matching closing </div>

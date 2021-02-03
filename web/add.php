@@ -29,7 +29,7 @@ if (!isset($name) || ($name === ''))
   $error = "empty_name";
 }
 
-// we need to do different things depending on if its a room
+// we need to do different things depending on if it's a room
 // or an area
 elseif ($type == "area")
 {
@@ -42,5 +42,5 @@ elseif ($type == "room")
 }
 
 $returl = "admin.php?area=$area" . (!empty($error) ? "&error=$error" : "");
-header("Location: $returl");
+location_header($returl);
 

@@ -58,7 +58,7 @@ function map_add_booking(array $entry, &$column, $start_first_slot, $start_last_
 
   global $resolution;
   global $is_private_field;
-
+  
   // We're only interested in entries which occur on this day (it's possible
   // for $entry to contain entries for other days)
   if (($entry['start_time'] >= $start_last_slot + $resolution) ||
@@ -201,6 +201,19 @@ function get_entry_classes($entry)
   {
     $classes[] = 'series';
   }
+  
+  if ($entry['allow_registration'])
+  {
+    if ($entry['enable_registrant_limit'] &&
+        ($entry['n_registered'] >= $entry['registrant_limit']))
+    {
+      $classes[] = 'full';
+    }
+    else
+    {
+      $classes[] = 'spaces';
+    }
+  }
 
   return $classes;
 }
@@ -266,7 +279,7 @@ function cell_html(array $cell, array $query_vars, $is_invalid = false)
         $vars = ($enable_periods) ? $query_vars['new_periods'] : $query_vars['new_times'];
         $query = http_build_query($vars, '', '&');
 
-        $html .= '<a href="edit_entry.php?' . htmlspecialchars($query) . '"' .
+        $html .= '<a href="' . htmlspecialchars(multisite("edit_entry.php?$query")) . '"' .
                  ' aria-label="' . htmlspecialchars(get_vocab('create_new_booking')) . "\">";
         if ($show_plus_link)
         {
@@ -312,7 +325,7 @@ function cell_html(array $cell, array $query_vars, $is_invalid = false)
         }
 
         $html .= '<div class="' . implode(' ', $classes) . '">';
-        $html .= '<a href="view_entry.php?' . htmlspecialchars($query) . '"' .
+        $html .= '<a href="' . htmlspecialchars(multisite("view_entry.php?$query")) . '"' .
                    ' title="' . htmlspecialchars($booking['description']) . '"' .
                    ' class="' . $booking['type'] . '"' .
                    ' data-id="' . $booking['id'] . '"' .
@@ -353,7 +366,7 @@ function time_cell_html($s, $url)
   $html = '';
 
   $html .= "<th data-seconds=\"$s\">";
-  $html .= "<a href=\"$url\"  title=\"" . get_vocab("highlight_line") . "\">";
+  $html .= '<a href="' . htmlspecialchars($url) . '"  title="' . get_vocab("highlight_line") . "\">";
 
   if ($enable_periods)
   {
@@ -375,6 +388,7 @@ function time_cell_html($s, $url)
 function room_cell_html(array $room, array $vars)
 {
   $link = 'index.php?' . http_build_query($vars, '', '&');
+  $link = multisite($link);
 
   switch ($vars['view'])
   {
@@ -489,9 +503,7 @@ function get_n_time_slots()
   {
     $end_last += SECONDS_PER_DAY;
   }
-  $n_slots = ($end_last - $start_first)/$resolution;
-
-  return $n_slots;
+  return ($end_last - $start_first)/$resolution;
 }
 
 
@@ -771,7 +783,8 @@ function day_table_innerhtml($view, $year, $month, $day, $area_id, $room_id, $ti
         $vars['timetohighlight'] = $s;
       }
 
-      $url = "index.php?" . htmlspecialchars(http_build_query($vars, '', '&'));
+      $url = "index.php?" . http_build_query($vars, '', '&');
+      $url = multisite($url);
 
       $tbody .= '<tr';
       if (!empty($classes))
@@ -845,7 +858,7 @@ function get_flex_div($slots, $classes, $title=null, $text=null)
 }
 
 
-function week_table_innerhtml($view, $view_all, $year, $month, $day, $area_id, $room_id)
+function week_table_innerhtml($view, $view_all, $year, $month, $day, $area_id, $room_id, $timetohighlight)
 {
   if ($view_all)
   {
@@ -853,7 +866,7 @@ function week_table_innerhtml($view, $view_all, $year, $month, $day, $area_id, $
   }
   else
   {
-    return week_room_table_innerhtml($view, $view_all, $year, $month, $day, $area_id, $room_id);
+    return week_room_table_innerhtml($view, $view_all, $year, $month, $day, $area_id, $room_id, $timetohighlight);
   }
 }
 
@@ -1028,6 +1041,7 @@ function multiday_view_all_rooms_innerhtml($view, $view_all, $year, $month, $day
         }
         $vars['page_date'] = format_iso_date($year, $month, $day_start_interval + $j);
         $link = "index.php?" . http_build_query($vars, '', '&');
+        $link = multisite($link);
         $t = mktime(12, 0, 0, $month, $day_start_interval + $j, $year);
         $text = ($i === 0) ? get_day($t, $view) : get_date($t, $view);
         $header_inner_rows[$i] .= '<th><a href="' . htmlspecialchars($link) . '">' . htmlspecialchars($text) . "</a></th>\n";
@@ -1093,6 +1107,7 @@ function multiday_view_all_rooms_innerhtml($view, $view_all, $year, $month, $day
           );
 
         $link = "index.php?" . http_build_query($vars, '', '&');
+        $link = multisite($link);
         $tbody .= '<a href="' . htmlspecialchars($link) . "\">\n";
         $s = $morning_slot_seconds;
         $slots = 0;
@@ -1345,6 +1360,7 @@ function week_room_table_innerhtml($view, $view_all, $year, $month, $day, $area_
                     'room'     => $room_id);
 
       $link = 'index.php?' . http_build_query($vars, '', '&');
+      $link = multisite($link);
       $text = utf8_strftime($dformat, $t);
       $header_inner .= day_cell_html($text, $link, $date);
     }
@@ -1399,6 +1415,7 @@ function week_room_table_innerhtml($view, $view_all, $year, $month, $day, $area_
                     'room'     => $room_id);
 
       $day_cell_link = 'index.php?' . http_build_query($vars, '', '&');
+      $day_cell_link = multisite($day_cell_link);
       $row_label = day_cell_html($day_cell_text, $day_cell_link, $wdate);
       $tbody .= $row_label;
 
@@ -1454,7 +1471,8 @@ function week_room_table_innerhtml($view, $view_all, $year, $month, $day, $area_
         $vars['timetohighlight'] = $s;
       }
 
-      $url = 'index.php?' . htmlspecialchars(http_build_query($vars, '', '&'));
+      $url = 'index.php?' . http_build_query($vars, '', '&');
+      $url = multisite($url);
 
       $tbody.= '<tr';
       if (!empty($classes))
@@ -1570,13 +1588,10 @@ function get_booking_summary($start, $end, $day_start, $day_end)
   // Use ~ (not -) to separate the start and stop times, because MSIE
   // will incorrectly line break after a -.
   $separator = '~';
-  //$after_today = "====&gt;";
-  $after_today = "====>";  //jimmy
-  //$before_today = "&lt;====";
-  $before_today = "<===="; //jimmy
+  $after_today = "==>";
+  $before_today = "<==";
   $midnight = "24:00";  // need to fix this so it works with AM/PM configurations (and for that matter 24h)
-  // Localized "all day" text but with non-breaking spaces:
-  $all_day = preg_replace("/ /", "&nbsp;", get_vocab("all_day"));
+  $all_day = get_vocab('all_day');
 
   if ($enable_periods)
   {
@@ -1676,16 +1691,7 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
   {
     $html .= get_blank_day($weekcol);
   }
-//jimmy
-  global $show_holiday ;
-  $holidays = get_holidays($year);
 
-  global $show_today;
-  $datetime = new DateTime();
-  $thisyear = $datetime->format('Y');
-  $thismonth = $datetime->format('m');
-  $today = $datetime->format('d');
-  // jimmy -end
   // Get the data.  It's much quicker to do a single SQL query getting all the
   // entries for the interval in one go, rather than doing a query for each day.
   $entries = get_entries_by_room($room,
@@ -1721,29 +1727,7 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
     }
     else
     {
-      //jimmy
-      $td_class = "valid";
-      if ($show_holiday){
-          $search_text = date("Y-m-d", strtotime($year."-".$month."-".$d));
-          $hidx = False;
-          foreach ($holidays as $value){
-              $hidx = stripos($value, $search_text);
-             if($hidx !== False){
-                 $hdays = explode(",", $value);
-                break;
-            }
-          }
-        if  ($hidx !== False) {
-            $td_class = "holiday";
-        }
-      }
-      if ($show_today){
-        if (($year == $thisyear) and ($month == $thismonth) and ($d == $today)){
-          $td_class = "today";
-        }
-	  }
-      $html .= "<td class=\"$td_class\">\n";
-      // jimmy -end
+      $html .= "<td class=\"valid\">\n";
       $html .= "<div class=\"cell_container\">\n";
 
       $html .= "<div class=\"cell_header\">\n";
@@ -1759,21 +1743,15 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
       {
         $vars['view'] = 'week';
         $query = http_build_query($vars, '', '&');
-        $html .= '<a class="week_number" href="index.php?' . htmlspecialchars($query) . '">';
+        $html .= '<a class="week_number" href="' . htmlspecialchars(multisite("index.php?$query")) . '">';
         $html .= date("W", gmmktime(12, 0, 0, $month, $d, $year));
         $html .= "</a>\n";
       }
       // then put in the day of the month
       $vars['view'] = 'day';
       $query = http_build_query($vars, '', '&');
-      $html .= '<a class="monthday" href="index.php?' . htmlspecialchars($query) . "\">$d</a>\n";
-      //jimmy
-      if ($show_holiday){
-          if  ($hidx !== False) {
-            $html .= "<spen class=\"holiday\">$hdays[1]</spen>\n";
-          }
-      }
-      // jimmy, end show_holiday
+      $html .= '<a class="monthday" href="' . htmlspecialchars(multisite("index.php?$query")) . "\">$d</a>\n";
+
       $html .= "</div>\n";
 
       // then the link to make a new booking
@@ -1791,7 +1769,7 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
 
       $query = http_build_query($vars, '', '&');
 
-      $html .= '<a class="new_booking" href="edit_entry.php?' . htmlspecialchars($query) . '"' .
+      $html .= '<a class="new_booking" href="' . htmlspecialchars(multisite("edit_entry.php?$query")) . '"' .
                ' aria-label="' . htmlspecialchars(get_vocab('create_new_booking')) . "\">\n";
       if ($show_plus_link)
       {
@@ -1841,7 +1819,7 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
                       'day'   => $d);
 
         $query = http_build_query($vars, '', '&');
-        $booking_link = "view_entry.php?$query";
+        $booking_link = multisite("view_entry.php?$query");
         $slot_text = get_booking_summary(
                        $entry['start_time'],
                        $entry['end_time'],

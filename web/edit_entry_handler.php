@@ -14,7 +14,17 @@ function invalid_booking($message)
 {
   global $view, $view_all, $year, $month, $day, $area, $room;
 
-  print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
+  $context = array(
+    'view'      => $view,
+    'view_all'  => $view_all,
+    'year'      => $year,
+    'month'     => $month,
+    'day'       => $day,
+    'area'      => $area,
+    'room'      => isset($room) ? $room : null
+  );
+
+  print_header($context);
   echo "<h1>" . get_vocab('invalid_booking') . "</h1>\n";
   echo "<p>$message</p>\n";
   // Print footer and exit
@@ -38,7 +48,8 @@ Form::checkToken();
 //  ---------------------------------------------
 checkAuthorised(this_page());
 
-$current_username = getUserName();
+$mrbs_user = session()->getCurrentUser();
+$mrbs_username = (isset($mrbs_user)) ? $mrbs_user->username : null;
 
 
 // (2) Get the form variables
@@ -46,7 +57,7 @@ $current_username = getUserName();
 
 // NOTE:  the code on this page assumes that array form variables are passed
 // as an array of values, rather than an array indexed by value.   This is
-// particularly important for checkbox arrays whicgh should be formed like this:
+// particularly important for checkbox arrays which should be formed like this:
 //
 //    <input type="checkbox" name="foo[]" value="n">
 //    <input type="checkbox" name="foo[]" value="m">
@@ -62,39 +73,42 @@ $current_username = getUserName();
 
 // Get non-standard form variables
 $form_vars = array(
-  'create_by'          => 'string',
-  'name'               => 'string',
-  'description'        => 'string',
-  'start_seconds'      => 'int',
-  'start_date'         => 'string',
-  'end_seconds'        => 'int',
-  'end_date'           => 'string',
-  'all_day'            => 'string',  // bool, actually
-  'type'               => 'string',
-  'rooms'              => 'array',
-  'original_room_id'   => 'int',
-  'ical_uid'           => 'string',
-  'ical_sequence'      => 'int',
-  'ical_recur_id'      => 'string',
-  'returl'             => 'string',
-  'id'                 => 'int',
-  'rep_id'             => 'int',
-  'edit_type'          => 'string',
-  'rep_type'           => 'int',
-  'rep_end_date'       => 'string',
-  'rep_day'            => 'array',   // array of bools
-  'rep_interval'       => 'int',
-  'month_type'         => 'int',
-  'month_absolute'     => 'int',
-  'month_relative_ord' => 'string',
-  'month_relative_day' => 'string',
-  'skip'               => 'string',  // bool, actually
-  'no_mail'            => 'string',  // bool, actually
-  'private'            => 'string',  // bool, actually
-  'confirmed'          => 'string',
-  'back_button'        => 'string',
-  'timetohighlight'    => 'int',
-  'commit'             => 'string'
+  'create_by'               => 'string',
+  'name'                    => 'string',
+  'description'             => 'string',
+  'start_seconds'           => 'int',
+  'start_date'              => 'string',
+  'end_seconds'             => 'int',
+  'end_date'                => 'string',
+  'all_day'                 => 'string',  // bool, actually
+  'type'                    => 'string',
+  'rooms'                   => 'array',
+  'original_room_id'        => 'int',
+  'ical_uid'                => 'string',
+  'ical_sequence'           => 'int',
+  'ical_recur_id'           => 'string',
+  'allow_registration'      => 'string',  // bool, actually
+  'enable_registrant_limit' => 'string',  // bool, actually
+  'registrant_limit'        => 'int',
+  'returl'                  => 'string',
+  'id'                      => 'int',
+  'rep_id'                  => 'int',
+  'edit_type'               => 'string',
+  'rep_type'                => 'int',
+  'rep_end_date'            => 'string',
+  'rep_day'                 => 'array',   // array of bools
+  'rep_interval'            => 'int',
+  'month_type'              => 'int',
+  'month_absolute'          => 'int',
+  'month_relative_ord'      => 'string',
+  'month_relative_day'      => 'string',
+  'skip'                    => 'string',  // bool, actually
+  'no_mail'                 => 'string',  // bool, actually
+  'private'                 => 'string',  // bool, actually
+  'confirmed'               => 'string',
+  'back_button'             => 'string',
+  'timetohighlight'         => 'int',
+  'commit'                  => 'string'
 );
 
 foreach($form_vars as $var => $var_type)
@@ -108,19 +122,6 @@ foreach($form_vars as $var => $var_type)
     $$var = truncate($$var, "entry.$var");
   }
 
-}
-
-// Validate the create_by variable, checking that it's the current user, unless the
-// user is an admin and we allow admins to make bookings on behalf of others.
-if (!$is_ajax &&
-    (!is_book_admin($rooms) || $auth['admin_can_only_book_for_self']))
-{
-  if ($create_by !== $current_username)
-  {
-    $message = "Attempt made by user '$current_username' to make a booking in the name of '$create_by'";
-    trigger_error($message, E_USER_NOTICE);
-    $create_by = $current_username;
-  }
 }
 
 // If they're not an admin and multi-day bookings are not allowed, then
@@ -145,15 +146,14 @@ if (!empty($back_button))
   {
     $returl = "index.php";
   }
-  header("Location: $returl");
-  exit();
+  location_header($returl);
 }
 
 // Get custom form variables
 $custom_fields = array();
 
 // Get the information about the fields in the entry table
-$fields = db()->field_info($tbl_entry);
+$fields = db()->field_info(_tbl('entry'));
 
 foreach($fields as $field)
 {
@@ -208,6 +208,33 @@ foreach($fields as $field)
 
 // Form validation checks.   Normally checked for client side.
 
+// The id must be either an integer or NULL, so that subsequent code that tests whether
+// isset($id) works.  (I suppose one could use !empty instead, but there's always the
+// possibility that sites have allowed 0 in their auto-increment/serial columns.)
+if (isset($id) && ($id == ''))
+{
+  unset($id);
+}
+
+// Validate the create_by variable, checking that it's the current user, unless the
+// user is an admin and the booking is being edited or it's a new booking and we allow
+// admins to make bookings on behalf of others.
+//
+// Only carry out this check if it's not an Ajax request.  If it is an Ajax request then
+// $create_by isn't set yet, but a getWritable check will be done later,
+if (!$is_ajax)
+{
+  if (!is_book_admin($rooms) || (!isset($id) && $auth['admin_can_only_book_for_self']))
+  {
+    if ($create_by !== $mrbs_username)
+    {
+      $message = "Attempt made by user '$mrbs_username' to make a booking in the name of '$create_by'";
+      trigger_error($message, E_USER_NOTICE);
+      $create_by = $mrbs_username;
+    }
+  }
+}
+
 if (empty($rooms))
 {
   if (!$is_ajax)
@@ -251,7 +278,7 @@ if (!$is_ajax)
             (array_key_exists($field, $custom_fields) && ($custom_fields[$field] === '')))
         {
           invalid_booking(get_vocab('missing_mandatory_field') . ' "' .
-                          get_loc_field_name($tbl_entry, $field) . '"');
+                          get_loc_field_name(_tbl('entry'), $field) . '"');
         }
       }
     }
@@ -261,6 +288,12 @@ if (!$is_ajax)
 if (!isset($type))
 {
   $type = $default_type;
+}
+
+// Check that the type is allowed
+if (!is_book_admin($rooms) && isset($auth['admin_only_types']) && in_array($type, $auth['admin_only_types']))
+{
+  invalid_booking(get_vocab('type_reserved_for_admins', get_type_vocab($type)));
 }
 
 if (isset($month_relative_ord) && isset($month_relative_day))
@@ -277,14 +310,6 @@ if ($private_mandatory)
 else
 {
   $isprivate = ($private) ? true : false;
-}
-
-// The id must be either an integer or NULL, so that subsequent code that tests whether
-// isset($id) works.  (I suppose one could use !empty instead, but there's always the
-// possibility that sites have allowed 0 in their auto-increment/serial columns.)
-if (isset($id) && ($id == ''))
-{
-  unset($id);
 }
 
 // Make sure the area corresponds to the room that is being booked
@@ -431,7 +456,11 @@ if (isset($id))
 {
   // Editing an existing booking: get the room_id from the database (you can't
   // get it from $rooms because they are the new rooms)
-  $existing_room = db()->query1("SELECT room_id FROM $tbl_entry WHERE id=? LIMIT 1", array($id));
+  $sql = "SELECT room_id
+            FROM " . _tbl('entry') . "
+           WHERE id=?
+           LIMIT 1";
+  $existing_room = db()->query1($sql, array($id));
   if ($existing_room < 0)
   {
     // Ideally we should give more feedback to the user when this happens, or
@@ -439,8 +468,7 @@ if (isset($id))
     $message = "Tried to edit an entry that no longer exists - probably because " .
                "somebody else has deleted it in the meantime.";
     trigger_error($message, E_USER_NOTICE);
-    header("Location: $returl");
-    exit;
+    location_header($returl);
   }
   $target_rooms[] = $existing_room;
   $target_rooms = array_unique($target_rooms);
@@ -610,8 +638,7 @@ if (empty($returl) ||
 // If we haven't been given a sensible date then get out of here and don't try and make a booking
 if (!isset($start_day) || !isset($start_month) || !isset($start_year) || !checkdate($start_month, $start_day, $start_year))
 {
-  header("Location: $returl");
-  exit;
+  location_header($returl);
 }
 
 // If the old sticky room is one of the rooms requested for booking, then don't change the sticky room.
@@ -662,7 +689,7 @@ foreach ($rooms as $room_id)
 
   $booking = array();
   $booking['create_by'] = $create_by;
-  $booking['modified_by'] = (isset($id)) ? $current_username : '';
+  $booking['modified_by'] = (isset($id)) ? $mrbs_username : '';
   $booking['name'] = $name;
   $booking['type'] = $type;
   $booking['description'] = $description;
@@ -676,6 +703,10 @@ foreach ($rooms as $room_id)
   $booking['ical_uid'] = $ical_uid;
   $booking['ical_sequence'] = $ical_sequence;
   $booking['ical_recur_id'] = $ical_recur_id;
+  $booking['allow_registration'] = $allow_registration;
+  $booking['enable_registrant_limit'] = $enable_registrant_limit;
+  $booking['registrant_limit'] = $registrant_limit;
+
   if ($booking['rep_type'] == REP_MONTHLY)
   {
     if ($month_type == REP_MONTH_ABSOLUTE)
@@ -722,7 +753,7 @@ $send_mail = ($no_mail) ? FALSE : need_to_send_mail();
 // if, for example, the database user hasn't been granted DELETE rights.
 
 // Acquire mutex to lock out others trying to book the same slot(s).
-if (!db()->mutex_lock($tbl_entry))
+if (!db()->mutex_lock(_tbl('entry')))
 {
   fatal_error(get_vocab("failed_to_acquire"));
 }
@@ -750,7 +781,7 @@ else
   trigger_error('Edit failed.', E_USER_WARNING);
 }
 
-db()->mutex_unlock($tbl_entry);
+db()->mutex_unlock(_tbl('entry'));
 
 
 // If this is an Ajax request, output the result and finish
@@ -783,13 +814,22 @@ if ($is_ajax)
 // Everything was OK.   Go back to where we came from
 if ($result['valid_booking'])
 {
-  header("Location: $returl");
-  exit;
+  location_header($returl);
 }
 
 else
 {
-  print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
+  $context = array(
+      'view'      => $view,
+      'view_all'  => $view_all,
+      'year'      => $year,
+      'month'     => $month,
+      'day'       => $day,
+      'area'      => $area,
+      'room'      => isset($room) ? $room : null
+    );
+
+  print_header($context);
 
   echo "<h2>" . get_vocab("sched_conflict") . "</h2>\n";
   if (!empty($result['violations']['errors']))
@@ -824,7 +864,7 @@ echo "<div id=\"submit_buttons\">\n";
 $form = new Form();
 
 $form->setAttributes(array('method' => 'post',
-                           'action' => $returl));
+                           'action' => multisite($returl)));
 
 $submit = new ElementInputSubmit();
 $submit->setAttribute('value', get_vocab('back'));
@@ -841,7 +881,7 @@ if (empty($result['violations']['errors'])  &&
   $form = new Form();
 
   $form->setAttributes(array('method' => 'post',
-                             'action' => this_page()));
+                             'action' => multisite(this_page())));
 
   // Put the booking data in as hidden inputs
   $skip = 1;  // Force a skip next time round

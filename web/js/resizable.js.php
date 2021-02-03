@@ -93,38 +93,6 @@ function rectanglesOverlap(r1, r2)
 
 
 <?php
-// Check whether the rectangle (with sides n,s,e,w) overlaps any
-// of the booked slots in the table.   Returns an array of overlapped
-// bookings.
-//    stopAtFirst       (optional) If true then only the first overlap found will
-//                      be returned.  Default false.
-//    ignoreRectangle   (optional).  A rectangle that is to be ignored when checking
-//                      for overlaps.
-?>
-function overlapsBooked(rectangle, bookedMap, stopAtFirst, ignoreRectangle)
-{
-  var result = [];
-
-  for (var i=0; i<bookedMap.length; i++)
-  {
-    if (!(ignoreRectangle && rectanglesIdentical(ignoreRectangle, bookedMap[i])))
-    {
-      if (rectanglesOverlap(rectangle, bookedMap[i]))
-      {
-        result.push(bookedMap[i]);
-        if (stopAtFirst)
-        {
-          break;
-        }
-      }
-    }
-  }
-
-  return result;
-}
-
-
-<?php
 // Gets the side-most side of the array of rectangles.
 // side can be 'n', 's', 'e' or 'w'
 ?>
@@ -172,6 +140,7 @@ var Table = {
   selector: ".dwm_main:not('#month_main')",
   borderLeftWidth: undefined,
   borderTopWidth: undefined,
+  bookedMap: [],
   grid: {},
 
   <?php
@@ -312,6 +281,26 @@ var Table = {
       }
     },  <?php // highlightRowLabels ?>
 
+
+  init: function() {
+    var table = $(Table.selector);
+    var container = table.parent();
+    <?php
+    // Initialise the bookedMap, which is an array of booked slots. Each member of the array is an
+    // object with four properties (n, s, e, w) representing the cooordinates (x or y)
+    // of the side.   We will use this array to test whether a proposed
+    // booking overlaps an existing booking. Select just the visible cells because there
+    // could be hidden days.
+    ?>
+    Table.bookedMap = [];
+    table.find('td.booked:visible').each(function() {
+        Table.bookedMap.push(getSides($(this)));
+      });
+    <?php // Size the table ?>
+    Table.size();
+  },
+
+
   <?php
   // Tests whether the point p with coordinates x and y is outside the table
   ?>
@@ -338,6 +327,64 @@ var Table = {
               (p.y > Table.grid.y.data[Table.grid.y.data.length - 1].coord) );
     },  <?php // outside() ?>
 
+
+  <?php
+  // Check whether the rectangle (with sides n,s,e,w) overlaps any
+  // of the booked slots in the table.   Returns an array of overlapped
+  // bookings.
+  //    stopAtFirst       (optional) If true then only the first overlap found will
+  //                      be returned.  Default false.
+  //    ignoreRectangle   (optional).  A rectangle that is to be ignored when checking
+  //                      for overlaps.
+  ?>
+  overlapsBooked: function overlapsBooked(rectangle, stopAtFirst, ignoreRectangle)
+  {
+    var result = [];
+
+    for (var i=0; i<Table.bookedMap.length; i++)
+    {
+      if (!(ignoreRectangle && rectanglesIdentical(ignoreRectangle, Table.bookedMap[i])))
+      {
+        if (rectanglesOverlap(rectangle, Table.bookedMap[i]))
+        {
+          result.push(Table.bookedMap[i]);
+          if (stopAtFirst)
+          {
+            break;
+          }
+        }
+      }
+    }
+
+    return result;
+  },
+
+
+  <?php
+  // Clip the element (typically the ui.helper) so that it doesn't protrude above the top
+  // of the table body
+  ?>
+  setClipPath: function(el) {
+      var path = 'none';
+      <?php
+      // Because we have shifted the th cells using JavaScript to give the effect of a sticky
+      // header, we have to look at the th cells rather than the thead.
+      ?>
+      var th = $(Table.selector).find('thead tr:last-child th:first-child');
+      var theadBottom = th.offset().top + th.outerHeight();
+      var elTop = el.offset().top;
+      var elHeight = el.outerHeight();
+      var above = theadBottom - elTop;
+
+      if (above > 0)
+      {
+        path = 'inset(' + above + 'px 0 0 0)';
+      }
+
+      el.css('clip-path', path);
+    },
+
+
   size: function() {
       <?php // Don't do anything if this is the all-rooms week view ?>
       if ((args.view == 'week') && args.view_all)
@@ -350,7 +397,7 @@ var Table = {
       // same as the value in the CSS if the browsers zoom level is not 100%.
       ?>
       var table = $(Table.selector);
-      var td = table.find('tbody tr:first-child td:first-child');
+      var td = table.find('tbody tr:first-child td:first-of-type');
       Table.borderLeftWidth = parseFloat(td.css('border-left-width'));
       Table.borderTopWidth = parseFloat(td.css('border-top-width'));
 
@@ -620,7 +667,7 @@ $(document).on('page_ready', function() {
         return;
       }
 
-      Table.size();
+      Table.init();
 
       var mouseDown = false;
 
@@ -628,7 +675,7 @@ $(document).on('page_ready', function() {
           mouseDown = true;
 
           <?php
-          // Apply a class so that we know that resizing is in progres, eg to turn off
+          // Apply a class so that we know that resizing is in progress, eg to turn off
           // highlighting
           ?>
           table.addClass('resizing');
@@ -648,7 +695,7 @@ $(document).on('page_ready', function() {
           downHandler.originalLink = jqTarget.find('a').addBack('a').attr('href');
           downHandler.box = $('<div class="div_select">');
 
-          if (!args.isAdmin)
+          if (!args.isBookAdmin)
           {
             <?php
             // If we're not an admin and we're not allowed to book repeats (in
@@ -732,7 +779,7 @@ $(document).on('page_ready', function() {
           // We set stopAtFirst=true because we just want to know if there is
           // *any* overlap.
           ?>
-          if (overlapsBooked(getSides(box), bookedMap, true).length)
+          if (Table.overlapsBooked(getSides(box), true).length)
           {
             box.offset(oldBoxOffset)
                .width(oldBoxWidth)
@@ -829,6 +876,10 @@ $(document).on('page_ready', function() {
             queryString += '&start_date=' + params.date[0];
             queryString += '&end_date=' + params.date[params.date.length - 1];
           }
+          if (args.site)
+          {
+            queryString += '&site=' + encodeURIComponent(args.site);
+          }
           window.location = 'edit_entry.php?' + queryString;
           return;
         };
@@ -901,7 +952,7 @@ $(document).on('page_ready', function() {
         // that it could overlap more than one other booking, so we need to find them
         // all and then find the closest one.
         ?>
-        var overlappedElements = overlapsBooked(rectangle, bookedMap, false, resizeStart.originalRectangle);
+        var overlappedElements = Table.overlapsBooked(rectangle, false, resizeStart.originalRectangle);
 
         if (!overlappedElements.length)
         {
@@ -1004,6 +1055,7 @@ $(document).on('page_ready', function() {
 
         Table.highlightRowLabels(ui.helper);
 
+        Table.setClipPath(ui.helper);
       };  <?php // resize ?>
 
 
@@ -1108,7 +1160,7 @@ $(document).on('page_ready', function() {
         {
           data.start_date = newParams.date[0];
           var onlyAdminCanBookRepeat = <?php echo ($auth['only_admin_can_book_repeat']) ? 'true' : 'false';?>;
-          if (args.isAdmin || !onlyAdminCanBookRepeat)
+          if (args.isBookAdmin || !onlyAdminCanBookRepeat)
           {
             if (newParams.date.length > 1)
             {
@@ -1134,6 +1186,11 @@ $(document).on('page_ready', function() {
         ?>
         booking.addClass('saving')
                .after('<span class="saving"><?php echo get_vocab('saving'); ?></span>');
+
+        if(args.site)
+        {
+          data.site = args.site;
+        }
 
         $.post('edit_entry_handler.php',
                data,
@@ -1179,19 +1236,6 @@ $(document).on('page_ready', function() {
 
 
       <?php
-      // bookedMap is an array of booked slots.   Each member of the array is an
-      // object with four properties (n, s, e, w) representing the cooordinates (x or y)
-      // of the side.   We will use this array to test whether a proposed
-      // booking overlaps an existing booking. Select just the visible cells because there
-      // could be hidden days.
-      ?>
-      var bookedMap = [];
-      table.find('td.booked:visible')
-           .each(function() {
-          bookedMap.push(getSides($(this)));
-        });
-
-      <?php
       // Turn all the empty cells where a new multi-cell selection
       // can be created by dragging the mouse
       ?>
@@ -1235,7 +1279,7 @@ $(document).on('page_ready', function() {
               ?>
               directions.other = {plus: false, minus: false};
             }
-            if (!args.isAdmin)
+            if (!args.isBookAdmin)
             {
               if (((args.view == 'week') && <?php echo ($auth['only_admin_can_book_repeat']) ? 'true' : 'false'?>) ||
                   ((args.view == 'day') && <?php echo ($auth['only_admin_can_select_multiroom']) ? 'true' : 'false'?>))
@@ -1379,9 +1423,18 @@ $(document).on('page_ready', function() {
         <?php
         // The table dimensions have changed, so we need to re-map the table
         ?>
-        Table.size();
+        Table.init();
       }
     }, 50));
+
+  <?php
+  // We need to re-initialise when the table container is scrolled because all the coordinates
+  // are relative to the document rather than  the container.  (The jQuery UI widget gives
+  // positions this way).
+  ?>
+  $(Table.selector).parent().on('scroll', throttle(function() {
+      Table.init();
+    }));
 
 });
 

@@ -16,7 +16,7 @@ function get_search_nav_button(array $hidden_inputs, $value, $disabled=false)
   $html = '';
 
   $form = new Form();
-  $form->setAttributes(array('action' => 'search.php',
+  $form->setAttributes(array('action' => multisite(this_page()),
                              'method' => 'post'));
   $form->addHiddenInputs($hidden_inputs);
   $submit = new ElementInputSubmit();
@@ -79,7 +79,7 @@ function output_row($row, $returl)
   $html_name = htmlspecialchars($row['name']);
   $values[] = "<a title=\"$html_name\" href=\"view_entry.php?" . htmlspecialchars($query) . "\">$html_name</a>";
   // created by
-  $values[] = htmlspecialchars($row['create_by']);
+  $values[] = htmlspecialchars(get_compound_name($row['create_by']));
   // start time and link to day view
   $date = getdate($row['start_time']);
 
@@ -155,7 +155,7 @@ if (isset($search_str) && ($search_str !== ''))
 // Check the user is authorised for this page
 checkAuthorised(this_page());
 
-$user = getUserName();
+$mrbs_user = session()->getCurrentUser();
 
 // Set up for Ajax.   We need to know whether we're capable of dealing with Ajax
 // requests, which will only be if the browser is using DataTables.  We also need
@@ -176,13 +176,23 @@ $search_start_time = mktime(0, 0, 0, $month, $day, $year);
 
 if (!$is_ajax)
 {
-  print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
+  $context = array(
+      'view'      => $view,
+      'view_all'  => $view_all,
+      'year'      => $year,
+      'month'     => $month,
+      'day'       => $day,
+      'area'      => $area,
+      'room'      => isset($room) ? $room : null
+    );
+
+  print_header($context);
 
   $form = new Form();
   $form->setAttributes(array('class'  => 'standard',
                              'id'     => 'search_form',
                              'method' => 'post',
-                             'action' => 'search.php'));
+                             'action' => multisite(this_page())));
 
   $fieldset = new ElementFieldset();
   $fieldset->addLegend(get_vocab('search'));
@@ -238,7 +248,7 @@ $sql_pred = "(( " . db()->syntax_caseless_contains("E.create_by", $search_str, $
 
 // Also need to search custom fields (but only those with character data,
 // which can include fields that have an associative array of options)
-$fields = db()->field_info($tbl_entry);
+$fields = db()->field_info(_tbl('entry'));
 foreach ($fields as $field)
 {
   if (!in_array($field['name'], $standard_fields['entry']))
@@ -284,37 +294,25 @@ if (count($invisible_room_ids) > 0)
 // entries will be found, which is at least safe from the privacy viewpoint)
 if (!is_book_admin())
 {
-  if (isset($user))
+  if (isset($mrbs_user))
   {
     // if the user is logged in they can see:
     //   - all bookings, if private_override is set to 'public'
     //   - their own bookings, and others' public bookings if private_override is set to 'none'
     //   - just their own bookings, if private_override is set to 'private'
-    $sql_pred .= " AND (
-                        (A.private_override='public') OR
-                        (A.private_override='none') AND
-                        (
-                         (E.status&" . STATUS_PRIVATE . "=0) OR
-                         (E.create_by = ?) OR
-                         (
-                          (A.private_override='private') AND (E.create_by = ?)
-                         )
-                        )
-                       )";
-    $sql_params[] = $user;
-    $sql_params[] = $user;
+    $sql_pred .= " AND ((A.private_override='public') OR
+                        ((A.private_override='none') AND ((E.status&" . STATUS_PRIVATE . "=0) OR (E.create_by = ?))) OR
+                        ((A.private_override='private') AND (E.create_by = ?)))";
+    $sql_params[] = $mrbs_user->username;
+    $sql_params[] = $mrbs_user->username;
   }
   else
   {
     // if the user is not logged in they can see:
     //   - all bookings, if private_override is set to 'public'
     //   - public bookings if private_override is set to 'none'
-    $sql_pred .= " AND (
-                        (A.private_override='public') OR
-                        (
-                         (A.private_override='none') AND (E.status&" . STATUS_PRIVATE . "=0)
-                        )
-                       )";
+    $sql_pred .= " AND ((A.private_override='public') OR
+                        ((A.private_override='none') AND (E.status&" . STATUS_PRIVATE . "=0)))";
   }
 }
 
@@ -324,7 +322,7 @@ if (!is_book_admin())
 if (!isset($total))
 {
   $sql = "SELECT count(*)
-          FROM $tbl_entry E, $tbl_room R, $tbl_area A
+          FROM " . _tbl('entry') . " E, " . _tbl('room') . " R, " . _tbl('area') . " A
           WHERE $sql_pred";
   $total = db()->query1($sql, $sql_params);
 }
@@ -353,7 +351,7 @@ if (!$ajax_capable || $is_ajax)
   // Now we set up the "real" query
   $sql = "SELECT E.id AS entry_id, E.create_by, E.name, E.description, E.start_time,
                  E.room_id, R.area_id, A.enable_periods
-            FROM $tbl_entry E, $tbl_room R, $tbl_area A
+            FROM " . _tbl('entry') . " E, " . _tbl('room') . " R, " . _tbl('area') . " A
            WHERE $sql_pred
         ORDER BY E.start_time asc";
   // If it's an Ajax query we want everything.  Otherwise we use LIMIT to just get

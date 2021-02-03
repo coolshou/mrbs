@@ -1,7 +1,8 @@
 <?php
 namespace MRBS;
 
-use \Locale;
+// Note that we are using \MRBS\Locale because \Locale has some bugs in it (and also
+// isn't always installed).
 
 require_once "functions.inc";
 
@@ -71,6 +72,7 @@ $datatables_lang_map = array(
   'Irish'               => 'ga',
   'Italian'             => 'it',
   'Japanese'            => 'ja',
+  'Kannada'             => 'kn',
   'Kazakh'              => 'kk',
   'Khmer'               => 'km',
   'Korean'              => 'ko',
@@ -90,7 +92,9 @@ $datatables_lang_map = array(
   'Polish'              => 'pl',
   'Portuguese-Brasil'   => 'pt-br',
   'Portuguese'          => 'pt',
+  'Punjabi'             => 'pa',
   'Romanian'            => 'ro',
+  'Rumantsch'           => 'rm',
   'Russian'             => 'ru',
   'Serbian'             => 'sr',
   'Serbian_latin'       => 'sr-latn',
@@ -201,7 +205,7 @@ function set_mrbs_locale($locale)
   {
     // $os_locale will be an array
     $message = "Server failed to set locale to " . json_encode($os_locale) .
-               " for language tag '$locale'.";;
+               " for language tag '$locale'.";
     trigger_error($message, E_USER_NOTICE);
 
     if (false === setlocale(LC_ALL, 'C'))
@@ -551,13 +555,23 @@ function get_best_lang_file($dir, $prefix='', $suffix='', array $default_langtag
 
 
 // Returns the pathname of the language file to use for the flatpickr
-// datepicker.    If no suitable language file exists then returns NULL
-// $dir is the directory containing the language files
-function get_flatpickr_lang_file($dir)
+// datepicker.    If no suitable language file exists then returns NULL.
+function get_flatpickr_lang_path()
 {
   global $flatpickr_lang_map;
 
-  return get_best_lang_file($dir, '', '.js', null, $flatpickr_lang_map);
+  static $have_result = false;
+  static $result = null;
+
+  if (!$have_result)
+  {
+    $dir = 'js/flatpickr/l10n';
+    $file = get_best_lang_file(__DIR__ . "/$dir", '', '.js', null, $flatpickr_lang_map);
+    $result = (isset($file)) ? "$dir/$file" : null;
+    $have_result = true;
+  }
+
+  return $result;
 }
 
 
@@ -574,13 +588,41 @@ function get_flatpickr_property($lang_file)
 
 
 // Returns the pathname of the language file to use for the dataTables
-// jQuery plugin.    If no suitable language file exists then returns NULL
-// $dir is the directory containing the language files
-function get_datatable_lang_file($dir)
+// jQuery plugin.    If no suitable language file exists then returns NULL.
+function get_datatable_lang_path()
 {
   global $datatables_lang_map;
 
-  return get_best_lang_file($dir, '', '.lang', null, $datatables_lang_map);
+  static $have_result = false;
+  static $result = null;
+
+  if (!$have_result)
+  {
+    $dir = 'jquery/datatables/language';
+    $file = get_best_lang_file(__DIR__ . "/$dir", '', '.lang', null, $datatables_lang_map);
+    $result = (isset($file)) ? "$dir/$file" : null;
+    $have_result = true;
+  }
+
+  return $result;
+}
+
+// Returns the pathname of the language file to use for the Select2
+// plugin.    If no suitable language file exists then returns NULL.
+function get_select2_lang_path()
+{
+  static $have_result = false;
+  static $result = null;
+
+  if (!$have_result)
+  {
+    $dir = 'jquery/select2/dist/js/i18n';
+    $file = get_best_lang_file(__DIR__ . "/$dir", '', '.js');
+    $result = (isset($file)) ? "$dir/$file" : null;
+    $have_result = true;
+  }
+
+  return $result;
 }
 
 

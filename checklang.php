@@ -1,5 +1,38 @@
-<html>
-<head><title>Language File Checker</title></head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Language File Checker</title>
+  <style>
+    form {
+      padding-left: 2em;
+    }
+
+    form div {
+      display: flex;
+      align-items: flex-start;
+      margin: 0.8em 0;
+    }
+
+    label,
+    input[type="checkbox"] {
+      margin-right: 1em;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border: 1px solid black;
+      padding: 0.2em 0.5em;
+      text-align: left;
+    }
+
+    select {
+      vertical-align: bottom;
+    }
+  </style>
+</head>
 <body>
 <h1>Language File Checker</h1>
 <p>
@@ -11,9 +44,6 @@
 // NOTE: You need to change this if you run checklang.php from anywhere but
 // the MRBS 'web' directory
 $path_to_mrbs = ".";
-
-require_once "$path_to_mrbs/systemdefaults.inc.php";
-require_once "$path_to_mrbs/config.inc.php";
 
 unset($lang);
 $lang = array();
@@ -38,13 +68,15 @@ while (($filename = readdir($dh)) !== false)
   $files[] = $filename;
 }
 closedir($dh);
-  
+
 sort($files);
 
 ?>
 
 <form method="get" action="checklang.php">
-<select multiple="multiple" size=5 name="lang[]">
+  <div>
+  <label for="languages">Select one or more languages:</label>
+<select id="languages" multiple="multiple" size="5" name="lang[]">
 <?php
 foreach ($files as $filename)
 {
@@ -65,12 +97,18 @@ foreach ($files as $filename)
 
 ?>
 </select>
-<br>
-<input type="checkbox" name="update">
-Update file(s) with new token lines (web server user requires write permission
-on files and directory) 
-<br>
+  </div>
+
+<div>
+<input id="update" type="checkbox" name="update">
+<label for="update">Update file(s) with new token lines (web server user requires write permission
+  on files and directory)</label>
+</div>
+
+<div>
 <input type="submit" name="submit" value="Go">
+</div>
+
 </form>
 
 <?php
@@ -153,7 +191,7 @@ foreach ($lang as $l)
         die("Failed to rename $path_to_mrbs/$langs$l to $path_to_mrbs/$langs$l.old");
       rename("$path_to_mrbs/$langs$l.new", "$path_to_mrbs/$langs$l") or
         die("Failed to rename $path_to_mrbs/$langs$l.new to $path_to_mrbs/$langs$l");
-      
+
       // Re-read the updated file
       unset($vocab);
       include "$path_to_mrbs/$langs$l";
@@ -168,7 +206,7 @@ foreach ($lang as $l)
   }
 ?>
 <h2>Language: <?php echo htmlspecialchars($l) ?></h2>
-<table border="1">
+<table>
   <tr>
     <th>Problem</th>
     <th>Key</th>
@@ -178,8 +216,8 @@ foreach ($lang as $l)
   $ntotal = 0;
   $nmissing = 0;
   $nunxlate = 0;
-  reset($ref);
-  while (list($key, $val) = each($ref))
+
+  foreach ($ref as $key => $val)
   {
     $ntotal++;
     $status = "";
@@ -187,7 +225,7 @@ foreach ($lang as $l)
     {
       $nmissing++;
       $status = "Missing";
-      
+
     } else if (($key != "charset") &&
                ($vocab[$key] == $ref[$key]) &&
                ($ref[$key] != "") &&
@@ -203,6 +241,7 @@ foreach ($lang as $l)
         htmlspecialchars($ref[$key]) . "</td></tr>\n";
     }
   }
+
   echo "</table>\n";
   echo "<p>Total entries in reference language file: $ntotal\n";
   echo "<br>For language file $l: ";
