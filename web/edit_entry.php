@@ -77,7 +77,7 @@ require 'defaultincludes.inc';
 require_once 'mrbs_sql.inc';
 require_once 'functions_mail.inc';
 
-$fields = db()->field_info(_tbl('entry'));
+$fields = db()->field_info($tbl_entry);
 $custom_fields = array();
 
 // Fill $edit_entry_field_order with not yet specified entries.
@@ -107,16 +107,139 @@ foreach ($fields as $field)
 }
 
 
+function get_field_entry_input($params)
+{
+  global $select_options, $datalist_options;
+
+  if (isset($params['field']))
+  {
+    if (!empty($select_options[$params['field']]))
+    {
+      $class = 'FieldSelect';
+    }
+    elseif (!empty($datalist_options[$params['field']]))
+    {
+      $class = 'FieldInputDatalist';
+    }
+    elseif ($params['field'] == 'entry.description')
+    {
+      $class = 'FieldTextarea';
+    }
+    else
+    {
+      $class = 'FieldInputText';
+    }
+  }
+  else
+  {
+    $class = 'FieldInputText';
+  }
+
+  $full_class = __NAMESPACE__ . "\\Form\\$class";
+  $field = new $full_class();
+  $field->setLabel($params['label'])
+        ->setControlAttribute('name', $params['name']);
+
+  if (!empty($params['required']))
+  {
+    $field->setControlAttribute('required', true);
+  }
+  if (!empty($params['disabled']))
+  {
+    $field->setControlAttribute('disabled', true);
+    $field->addHiddenInput($params['name'], $params['value']);
+  }
+
+  switch ($class)
+  {
+    case 'FieldSelect':
+      $options = $select_options[$params['field']];
+      $field->addSelectOptions($options, $params['value']);
+      break;
+
+    case 'FieldInputDatalist':
+      $options = $datalist_options[$params['field']];
+      $field->addDatalistOptions($options);
+      // Drop through
+
+    case 'FieldInputText':
+      if (!empty($params['required']))
+      {
+        // Set a pattern as well as required to prevent a string of whitespace
+        $field->setControlAttribute('pattern', REGEX_TEXT_POS);
+      }
+      // Drop through
+
+    case 'FieldTextarea':
+      if ($class == 'FieldTextarea')
+      {
+        $field->setControlText($params['value']);
+      }
+      else
+      {
+        $field->setControlAttribute('value', $params['value']);
+      }
+      if (isset($params['field']) &&
+          (null !== ($maxlength = maxlength($params['field']))))
+      {
+        $field->setControlAttribute('maxlength', $maxlength);
+      }
+      break;
+
+    default:
+      throw new \Exception("Unknown class '$class'");
+      break;
+  }
+
+  return $field;
+}
+
+
 function get_field_create_by($create_by, $disabled=false)
 {
-  $params = array('label'    => get_vocab('createdby'),
-                  'name'     => 'create_by',
-                  'field'    => 'entry.create_by',
-                  'value'    => $create_by,
-                  'required' => true,
-                  'disabled' => $disabled);
+  if (function_exists(__NAMESPACE__ . "\\authGetUsernames"))
+  {
+    $users = authGetUsernames();
+  }
 
-  return get_user_field($params);
+  if (!empty($users))
+  {
+    // We can get a list of all users, so present a <select> element
+    $options = array();
+
+    foreach ($users as $user)
+    {
+      if (isset($user['display_name']) && ($user['display_name'] !== ''))
+      {
+        $options[$user['username']] = $user['display_name'];
+      }
+      else
+      {
+        $options[$user['username']] = $user['username'];
+      }
+    }
+
+    $field = new FieldSelect();
+    $field->setLabel(get_vocab('createdby'))
+          ->setControlAttributes(array('name'     => 'create_by',
+                                       'disabled' => $disabled))
+          ->addSelectOptions($options, $create_by, true);
+  }
+  else
+  {
+    // We don't know all the available users, so we'll just present
+    // a text input field and rely on the user to enter a valid username.
+    $params = array('label'    => get_vocab('createdby'),
+                    'name'     => 'create_by',
+                    'field'    => 'entry.create_by',
+                    'value'    => $create_by,
+                    'required' => true,
+                    'disabled' => $disabled);
+
+    $field = get_field_entry_input($params);
+  }
+
+  return $field;
 }
 
 
@@ -297,8 +420,7 @@ function get_field_start_time($value, $disabled=false)
                                      'disabled' => $disabled,
                                      'required' => true));
 
-  $field->setAttribute('class', 'start_end')
-        ->setLabel(get_vocab('start'))
+  $field->setLabel(get_vocab('start'))
         ->addControlElement($element_date)
         ->addControlElement(get_slot_selector($areas[$area_id],
                                               'start_seconds',
@@ -339,7 +461,7 @@ function get_field_end_time($value, $disabled=false)
   global $areas, $area_id;
   global $multiday_allowed;
 
-  $date = getbookingdate($value, true);
+  $date = getbookingdate($value);
   $end_date = format_iso_date($date['year'], $date['mon'], $date['mday']);
   $current_s = (($date['hours'] * 60) + $date['minutes']) * 60;
 
@@ -365,8 +487,7 @@ function get_field_end_time($value, $disabled=false)
   $a = $areas[$area_id];
   $this_current_s = ($a['enable_periods']) ? $current_s - $a['resolution'] : $current_s;
 
-  $field->setAttribute('class', 'start_end')
-        ->setLabel(get_vocab('end'))
+  $field->setLabel(get_vocab('end'))
         ->addControlElement($element_date)
         ->addControlElement(get_slot_selector($areas[$area_id],
                                               'end_seconds',
@@ -505,11 +626,15 @@ function get_field_type($value, $disabled=false)
   }
 
   // Get the options
-  $options = get_type_options(is_book_admin());
-  // If it's a mandatory field add a blank option to force a selection
   if (!empty($is_mandatory_field['entry.type']))
   {
-    $options = array('' => get_type_vocab('')) + $options;
+    // Add a blank option to force a selection
+    $options[''] = get_type_vocab('');
+  }
+
+  foreach ($booking_types as $key)
+  {
+    $options[$key] = get_type_vocab($key);
   }
 
   $field = new FieldSelect();
@@ -561,13 +686,10 @@ function get_field_privacy_status($value, $disabled=false)
 
   $value = ($value) ? 1 : 0;
 
-  // Admins are allowed to do what they want
-  $disable_field = (!is_book_admin() && $private_mandatory) || $disabled;
-
   $field = new FieldInputRadioGroup();
 
   $field->setLabel(get_vocab('privacy_status'))
-        ->addRadioOptions($options, 'private', $value, true, $disable_field);
+        ->addRadioOptions($options, 'private', $value, true, $private_mandatory || $disabled);
 
   return $field;
 }
@@ -575,7 +697,7 @@ function get_field_privacy_status($value, $disabled=false)
 
 function get_field_custom($key, $disabled=false)
 {
-  global $custom_fields, $custom_fields_map;
+  global $custom_fields, $custom_fields_map, $tbl_entry;
   global $is_mandatory_field, $text_input_max;
 
   // First check that the custom field exists.  It normally will, but won't if
@@ -613,7 +735,7 @@ function get_field_custom($key, $disabled=false)
   // <datalist>s)
   else
   {
-    $params = array('label'    => get_loc_field_name(_tbl('entry'), $key),
+    $params = array('label'    => get_loc_field_name($tbl_entry, $key),
                     'name'     => VAR_PREFIX . $key,
                     'field'    => "entry.$key",
                     'value'    => (isset($custom_fields[$key])) ? $custom_fields[$key] : NULL,
@@ -625,7 +747,7 @@ function get_field_custom($key, $disabled=false)
   $full_class = __NAMESPACE__ . "\\Form\\$class";
   $field = new $full_class();
 
-  $field->setLabel(get_loc_field_name(_tbl('entry'), $key))
+  $field->setLabel(get_loc_field_name($tbl_entry, $key))
         ->setControlAttributes(array('name'     => VAR_PREFIX . $key,
                                      'disabled' => $disabled,
                                      'required' => !empty($is_mandatory_field["entry.$key"])));
@@ -909,49 +1031,6 @@ function get_field_skip_conflicts($disabled=false)
   return $field;
 }
 
-function get_fieldset_registration()
-{
-  global $enable_registration;
-  global $allow_registration, $enable_registrant_limit, $registrant_limit;
-
-  if (!$enable_registration || !is_book_admin())
-  {
-    return null;
-  }
-
-  $fieldset = new ElementFieldset();
-
-  $fieldset->setAttribute('id', 'registration');
-
-  $field = new FieldInputCheckbox();
-  $field->setLabel(get_vocab('allow_registration'))
-    ->setControlAttribute('name', 'allow_registration')
-    ->setChecked($allow_registration);
-
-  $fieldset->addElement($field);
-
-  $field = new FieldInputCheckbox();
-  $field->setLabel(get_vocab('enable_registrant_limit'))
-    ->setControlAttribute('name', 'enable_registrant_limit')
-    ->setChecked($enable_registrant_limit);
-
-  $fieldset->addElement($field);
-
-  $field = new FieldInputNumber();
-  $field->setLabel(get_vocab('registrant_limit'))
-        ->setControlAttributes(array(
-              'id'       => 'registrant_limit',
-              'name'     => 'registrant_limit',
-              'min'      => '0',
-              'value'    => $registrant_limit
-            )
-          );
-
-  $fieldset->addElement($field);
-
-  return $fieldset;
-}
-
 
 function get_fieldset_repeat()
 {
@@ -1106,8 +1185,7 @@ if (!isset($returl))
 // Check the user is authorised for this page
 checkAuthorised(this_page());
 
-$mrbs_user = session()->getCurrentUser();
-$mrbs_username = (isset($mrbs_user)) ? $mrbs_user->username : null;
+$current_username = getUserName();
 
 // You're only allowed to make repeat bookings if you're an admin
 // or else if $auth['only_admin_can_book_repeat'] is not set
@@ -1179,7 +1257,7 @@ if (isset($id))
   }
   // Need to clear some data if entry is private and user
   // does not have permission to edit/view details
-  if (isset($copy) && ($mrbs_username != $entry['create_by']))
+  if (isset($copy) && ($current_username != $entry['create_by']))
   {
     // Entry being copied by different user
     // If they don't have rights to view details, clear them
@@ -1235,9 +1313,6 @@ if (isset($id))
       case 'ical_recur_id':
       case 'entry_type':
       case 'tentative':
-      case 'allow_registration':
-      case 'enable_registrant_limit':
-      case 'registrant_limit':
         $$column = $entry[$column];
         break;
 
@@ -1256,7 +1331,7 @@ if (isset($id))
       case 'create_by':
         // If we're copying an existing entry then we need to change the create_by (they could be
         // different if it's an admin doing the copying)
-        $create_by   = (isset($copy)) ? $mrbs_username : $entry['create_by'];
+        $create_by   = (isset($copy)) ? $current_username : $entry['create_by'];
         break;
 
       case 'start_time':
@@ -1279,7 +1354,7 @@ if (isset($id))
   {
     $sql = "SELECT rep_type, start_time, end_time, end_date, rep_opt, rep_interval,
                    month_absolute, month_relative
-              FROM " . _tbl('repeat') . "
+              FROM $tbl_repeat
              WHERE id=?
              LIMIT 1";
 
@@ -1358,15 +1433,12 @@ else
   // It is a new booking. The data comes from whichever button the user clicked
   $edit_type     = "series";
   $name          = $default_name;
-  $create_by     = $mrbs_username;
+  $create_by     = $current_username;
   $description   = $default_description;
   $type          = (empty($is_mandatory_field['entry.type'])) ? $default_type : '';
   $room_id       = $room;
   $private       = $private_default;
   $tentative     = !$confirmed_default;
-  $allow_registration      = false;
-  $enable_registrant_limit = true;
-  $registrant_limit        = 1;
 
   // Get the hour and minute, converting a period to its MRBS time
   // Set some sensible defaults
@@ -1486,10 +1558,7 @@ $start_min   = strftime('%M', $start_time);
 // If we have not been provided with a room_id
 if (empty( $room_id ) )
 {
-  $sql = "SELECT id
-            FROM " . _tbl('room') . "
-           WHERE disabled=0
-           LIMIT 1";
+  $sql = "SELECT id FROM $tbl_room WHERE disabled=0 LIMIT 1";
   $res = db()->query($sql);
   $row = $res->next_row_keyed();
   $room_id = $row['id'];
@@ -1508,22 +1577,12 @@ if (!getWritable($create_by, $room_id))
   exit;
 }
 
-$context = array(
-    'view'      => $view,
-    'view_all'  => $view_all,
-    'year'      => $year,
-    'month'     => $month,
-    'day'       => $day,
-    'area'      => $area,
-    'room'      => isset($room) ? $room : null
-  );
-
-print_header($context);
+print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
 
 // Get the details of all the enabled rooms
 $rooms = array();
 $sql = "SELECT R.id, R.room_name, R.area_id
-          FROM " . _tbl('room') . " R, " . _tbl('area') . " A
+          FROM $tbl_room R, $tbl_area A
          WHERE R.area_id = A.id
            AND R.disabled=0
            AND A.disabled=0
@@ -1545,7 +1604,7 @@ $sql = "SELECT id, area_name, resolution, default_duration, default_duration_all
                enable_periods, periods, timezone,
                morningstarts, morningstarts_minutes, eveningends , eveningends_minutes,
                max_duration_enabled, max_duration_secs, max_duration_periods
-          FROM " . _tbl('area') . "
+          FROM $tbl_area
          WHERE disabled=0
       ORDER BY sort_key";
 $res = db()->query($sql);
@@ -1641,7 +1700,7 @@ $form = new Form();
 
 $form->setAttributes(array('class'  => 'standard js_hidden',
                            'id'     => 'main',
-                           'action' => multisite('edit_entry_handler.php'),
+                           'action' => 'edit_entry_handler.php',
                            'method' => 'post'));
 
 $hidden_inputs = array('returl'    => $returl,
@@ -1736,8 +1795,6 @@ foreach ($edit_entry_field_order as $key)
 } // foreach
 
 $form->addElement($fieldset);
-
-$form->addElement(get_fieldset_registration());
 
 // Show the repeat fields if (a) it's a new booking and repeats are allowed,
 // or else if it's an existing booking and it's a series.  (It's not particularly obvious but

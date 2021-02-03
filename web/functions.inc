@@ -2,84 +2,9 @@
 namespace MRBS;
 
 use \DateTimeZone;
-use MRBS\Form\FieldSelect;
 use PHPMailer\PHPMailer\PHPMailer;
 
 require_once "mrbs_sql.inc";
-
-
-// Case-insensitive in_array
-// See https://www.php.net/manual/en/function.in-array.php#Hcom89256
-function in_arrayi($needle, $haystack)
-{
-  return in_array(utf8_strtolower($needle),
-                  array_map(__NAMESPACE__ . "\\utf8_strtolower", $haystack));
-}
-
-
-function generate_token($length)
-{
-  if (function_exists('random_bytes'))
-  {
-    try
-    {
-      return bin2hex(random_bytes($length));  // PHP 7 and above
-    }
-    catch (\Exception $e)
-    {
-      // random_bytes() will throw an Exception if an appropriate source of randomness cannot be found.
-      // If that happens, just fall through and use one of the other methods.
-    }
-  }
-
-  if (function_exists('mcrypt_create_iv'))
-  {
-    return bin2hex(mcrypt_create_iv($length, MCRYPT_DEV_URANDOM));
-  }
-
-  if (function_exists('openssl_random_pseudo_bytes'))
-  {
-    return bin2hex(openssl_random_pseudo_bytes($length));
-  }
-
-  return md5(uniqid(rand(), true));
-}
-
-
-// Returns a name in the format last_name first_name for sorting
-function get_sortable_name($name)
-{
-  global $sort_users_by_last_name;
-
-  if (!isset($name))
-  {
-    return null;
-  }
-
-  if (empty($sort_users_by_last_name))
-  {
-    return $name;
-  }
-
-  $tokens = explode(' ', $name);
-
-  // Get rid of other whitespace (eg tabs)
-  $tokens = array_map('trim', $tokens);
-
-  // Get the last name
-  $result = array_pop($tokens);
-
-  // Add back in the first names
-  while (null !== ($token = array_shift($tokens)))
-  {
-    if ($token !== '') // weeds out multiple spaces in a name
-    {
-      $result .= ' ' . $token;
-    }
-  }
-
-  return $result;
-}
 
 
 // Tests whether the request has come via an Ajax call or not.
@@ -163,49 +88,6 @@ function url_get_contents($url)
 }
 
 
-function get_type_options($include_admin_types=false)
-{
-  global $booking_types, $auth;
-
-  $result = array();
-
-  if (isset($booking_types))
-  {
-    foreach ($booking_types as $key)
-    {
-      if (!$include_admin_types &&
-        isset($auth['admin_only_types']) &&
-        in_array($key, $auth['admin_only_types']))
-      {
-        continue;
-      }
-      $result[$key] = get_type_vocab($key);
-    }
-  }
-
-  return $result;
-}
-
-
-// Converts an array of types into a string
-function get_type_names($types, $glue=', ')
-{
-  if (empty($types))
-  {
-    return '';
-  }
-
-  $names = array();
-
-  foreach($types as $type)
-  {
-    $names[] = get_type_vocab($type);
-  }
-
-  return implode($glue, $names);
-}
-
-
 function get_rep_interval_units($rep_type, $rep_interval)
 {
   switch ($rep_type)
@@ -255,39 +137,43 @@ function get_rep_interval_units_mail($rep_type, $rep_interval)
 // Returns the maximum length, in characters, of a column, or NULL if the maximum
 // length is not known.   Should only be called after any database upgrades have been
 // performed as the results are stored in a static variable and so the maximum lengths
-// may change after an upgrade.  $column is of the form, <table_short_name.column_name>,
-// for example, 'area.area_name'.
+// may change after an upgrade.
 function maxlength($column)
 {
-  static $maxlengths = array();
+  global $table_vars;
 
-  list($table_short_name, $column_name) = explode('.', $column);
+  static $maxlengths = null;
 
-  if (!isset($maxlengths[$table_short_name]))
+  if (!isset($maxlengths))
   {
-    $maxlengths[$table_short_name] = array();
+    $maxlengths = array();
 
-    // Check to see if the table exists, as it won't yet if it's about
-    // to be created as part of an upgrade
-    if (db()->table_exists(_tbl($table_short_name)))
+    foreach ($table_vars as $table => $var)
     {
-      // Find the maximum length of the CHAR and VARCHAR fields (we won't
-      // worry about TEXT fields)
-      $field_info = db()->field_info(_tbl($table_short_name));
+      global $$var;
 
-      foreach ($field_info as $field)
+      // Check to see if the table exists, as it won't yet if it's about
+      // to be created as part of an upgrade
+      if (db()->table_exists($$var))
       {
-        if (($field['nature'] == 'character') &&
-            isset($field['length']) &&
-            ($field['length'] < 256))
+        // Find the maximum length of the CHAR and VARCHAR fields (we won't
+        // worry about TEXT fields)
+        $field_info = db()->field_info($$var);
+
+        foreach ($field_info as $field)
         {
-          $maxlengths[$table_short_name][$field['name']] = (int) $field['length'];
+          if (($field['nature'] == 'character') &&
+              isset($field['length']) &&
+              ($field['length'] < 256))
+          {
+            $maxlengths[$table . '.' . $field['name']] = (int) $field['length'];
+          }
         }
       }
     }
   }
 
-  return (isset($maxlengths[$table_short_name][$column_name])) ? $maxlengths[$table_short_name][$column_name] : null;
+  return (isset($maxlengths[$column])) ? $maxlengths[$column] : null;
 }
 
 
@@ -386,34 +272,6 @@ function mrbs_default_timezone_set($tz=null)
 function mrbs_default_timezone_get()
 {
   return date_default_timezone_get();
-}
-
-
-function get_display_name($username)
-{
-  $user = auth()->getUser($username);
-  return (isset($user)) ? $user->display_name : $username;
-}
-
-
-// Gets the username and display name, if different.  Useful in places such as search and
-// report results, where you have to search by username - because that's what's stored in
-// the entry - but you are interested in the display name.
-function get_compound_name($username)
-{
-  $result = '';
-
-  if (isset($username))
-  {
-    $result = $username;
-    $display_name = get_display_name($username);
-    if ($username !== $display_name)
-    {
-      $result .= " ($display_name)";
-    }
-  }
-
-  return $result;
 }
 
 
@@ -537,7 +395,7 @@ function url_base()
 
 
 // Returns the current page.   If the page ends in $suffix this will be cut off.
-// The existing query string is optionally added.
+// The query string is optionally added.
 function this_page($with_query_string=false, $suffix=null)
 {
   global $server;
@@ -553,27 +411,29 @@ function this_page($with_query_string=false, $suffix=null)
   // We use basename() because the full name causes problems when reverse proxies are being used.
   $result = basename($server['SCRIPT_NAME'], $suffix);
 
-  // Get the query string if required
   if ($with_query_string &&
       isset($server['QUERY_STRING']) &&
      ($server['QUERY_STRING'] !== ''))
   {
-    $query_string = $server['QUERY_STRING'];
-  }
-  else
-  {
-    $query_string = '';
-  }
-
-  parse_str($query_string, $query_string_parts);
-
-  // Add the query string back in
-  if (!empty($query_string_parts))
-  {
-    $result .= '?' . http_build_query($query_string_parts, '', '&');
+    $result = $result . "?" . $server['QUERY_STRING'];
   }
 
   return $result;
+}
+
+
+// Deal with $private_xxxx overrides.  Simplifies
+// logic related to private bookings.
+global $private_override;
+if ($private_override == "private" )
+{
+  $private_mandatory = true;
+  $private_default = true;
+}
+elseif ($private_override == "public" )
+{
+  $private_mandatory = true;
+  $private_default = false;
 }
 
 
@@ -583,91 +443,6 @@ function this_page($with_query_string=false, $suffix=null)
 function rfc1123_date($timestamp)
 {
   return gmdate("D, d M Y G:i:s \\G\\M\\T",$timestamp);
-}
-
-
-// Rebuilds a url that has been decompomosed into parts by parse_url().
-// See https://www.php.net/manual/en/function.parse-url.php#106731
-function build_url(array $parts)
-{
-    return (isset($parts['scheme']) ? "{$parts['scheme']}:" : '') .
-          ((isset($parts['user']) || isset($parts['host'])) ? '//' : '') .
-          (isset($parts['user']) ? "{$parts['user']}" : '') .
-          (isset($parts['pass']) ? ":{$parts['pass']}" : '') .
-          (isset($parts['user']) ? '@' : '') .
-          (isset($parts['host']) ? "{$parts['host']}" : '') .
-          (isset($parts['port']) ? ":{$parts['port']}" : '') .
-          (isset($parts['path']) ? "{$parts['path']}" : '') .
-          (isset($parts['query']) ? "?{$parts['query']}" : '') .
-          (isset($parts['fragment']) ? "#{$parts['fragment']}" : '');
-}
-
-
-// A wrapper for sending a Location header.  This function will urlencode and add
-// the site parameter as necesary
-function location_header($location)
-{
-  // Add the site parameter if necessary
-  $location = multisite($location);
-
-  // Encode the query string if there is one
-  $parts = parse_url($location);
-
-  if (isset($parts['query']))
-  {
-    parse_str($parts['query'], $result);
-    $parts['query'] = http_build_query($result, '', '&');
-  }
-
-  header('Location: ' . build_url($parts));
-  exit;
-}
-
-
-function add_query_parameter($location, $name, $value)
-{
-  $parts = parse_url($location);
-  if (!isset($parts['query']))
-  {
-    $parts['query'] = '';
-  }
-  parse_str($parts['query'], $result);
-  $result[$name] = $value;
-  $parts['query'] = http_build_query($result, '', '&');
-  $location = build_url($parts);
-
-  return $location;
-}
-
-
-// Adds the site parameter in the query string if necessary
-function multisite($location)
-{
-  global $multisite, $site;
-
-  // Add the site, if there one, to the query string
-  if ($multisite && isset($site) && ($site !== ''))
-  {
-    return add_query_parameter($location, 'site', $site);
-  }
-
-  return $location;
-}
-
-
-// Add a version parameter to a filename in order to force the use of the new
-// file instead of the cached version
-function add_version($filename)
-{
-  if (is_readable($filename))
-  {
-    $mtime = filemtime(parse_url($filename, PHP_URL_PATH));
-    if ($mtime !== false)
-    {
-      return add_query_parameter($filename, 'v', $mtime);
-    }
-  }
-  return $filename;
 }
 
 
@@ -715,23 +490,61 @@ function http_headers(array $headers, $expiry_seconds=0)
 // header uses are not yet available.
 function print_simple_header()
 {
-  print_header($context=null, $simple=true);
+  print_header($view=null, $view_all=null, $year=null, $month=null, $day=null, $area=null, $room=null, $simple=true);
 }
 
 
 // Print the page header
-// $context is an associative array indexed by 'view', 'view_all', 'year', 'month', 'day', 'area' and 'room',
-// any of which can be NULL.
-// When $omit_login is true the Login link is omitted.
-function print_header($context=null, $simple=false, $omit_login=false)
+function print_header($view=null, $view_all=null, $year=null, $month=null, $day=null, $area=null, $room=null, $simple=false)
 {
-  global $theme;
+  global $theme, $default_view;
 
   static $done_header = false;
 
   if ($done_header)
   {
     return;
+  }
+
+  // Need to set the timezone before we can use date()
+  if ($simple)
+  {
+    // We don't really care what timezone is being used
+    mrbs_default_timezone_set();
+  }
+  else
+  {
+    // This will set the correct timezone for the area
+    get_area_settings($area);
+  }
+
+  if (!isset($view))
+  {
+    $view = (isset($default_view)) ? $default_view : 'day';
+  }
+
+  // If we dont know the right date then use today's
+  if (!isset($year))
+  {
+    $year = date('Y');
+  }
+  if (!isset($month))
+  {
+    $month = date('m');
+  }
+  if (!isset($day))
+  {
+    $day = date('d');
+  }
+
+  if (empty($area))
+  {
+    $area = get_default_area();
+  }
+
+  if (empty($room))
+  {
+    $room = get_default_room($area);
   }
 
   // Load the print_theme_header function appropriate to the theme.    If there
@@ -746,7 +559,7 @@ function print_header($context=null, $simple=false, $omit_login=false)
   }
 
   // Now go and do it
-  print_theme_header($context, $simple, $omit_login);
+  print_theme_header($view, $view_all, $year, $month, $day, $area, $room, $simple);
 
   $done_header = true;
 }
@@ -780,61 +593,52 @@ function print_footer($and_exit=false)
 
 // Converts a duration of $dur seconds into a duration of
 // $dur $units
-// $max_unit can be set to 'seconds', 'minutes', 'hours', etc. and
-// is used to specify a maximum size of unit to use.  For example if
-// it is set to 'minutes', 3600 seconds will give 60 minutes rather
-// than 1 hour.
-function toTimeString(&$dur, &$units, $translate=true, $max_unit=null)
+function toTimeString(&$dur, &$units, $translate=true)
 {
-  if (!isset($max_unit))
-  {
-    $max_unit = 'years';
-  }
-
-  if (($max_unit != 'seconds') && (abs($dur) >= 60))
+  if (abs($dur) >= 60)
   {
     $dur /= 60;
 
-    if (($max_unit != 'minutes') && (abs($dur) >= 60))
+    if (abs($dur) >= 60)
     {
       $dur /= 60;
 
-      if(($max_unit != 'hours') && ((abs($dur) >= 24) && ($dur % 24 == 0)))
+      if((abs($dur) >= 24) && ($dur % 24 == 0))
       {
         $dur /= 24;
 
-        if(($max_unit != 'days') && ((abs($dur) >= DAYS_PER_WEEK) && ($dur % DAYS_PER_WEEK == 0)))
+        if((abs($dur) >= DAYS_PER_WEEK) && ($dur % DAYS_PER_WEEK == 0))
         {
           $dur /= DAYS_PER_WEEK;
 
-          if (($max_unit != 'weeks') && ((abs($dur) >= 52) && ($dur % 52 == 0)))
+          if ((abs($dur) >= 52) && ($dur % 52 == 0))
           {
             $dur  /= 52;
-            $units = 'years';
+            $units = "years";
           }
           else
           {
-            $units = 'weeks';
+            $units = "weeks";
           }
         }
         else
         {
-          $units = 'days';
+          $units = "days";
         }
       }
       else
       {
-        $units = 'hours';
+        $units = "hours";
       }
     }
     else
     {
-      $units = 'minutes';
+      $units = "minutes";
     }
   }
   else
   {
-    $units = 'seconds';
+    $units = "seconds";
   }
 
   // Limit any floating point values to three decimal places
@@ -1112,11 +916,11 @@ function get_start_first_slot($month, $day, $year)
 
   if ($enable_periods)
   {
-    return mktime(12, 0, 0, $month, $day, $year);
+    return mrbs_mktime(12, 0, 0, $month, $day, $year);
   }
 
-  return mktime($morningstarts, $morningstarts_minutes, 0,
-                $month, $day, $year);
+  return mrbs_mktime($morningstarts, $morningstarts_minutes, 0,
+                     $month, $day, $year);
 }
 
 
@@ -1127,7 +931,7 @@ function get_start_last_slot($month, $day, $year)
 
   if ($enable_periods)
   {
-    return mktime(12, count($periods) -1, 0, $month, $day, $year);
+    return mrbs_mktime(12, count($periods) -1, 0, $month, $day, $year);
   }
 
   // Work out if $evening_ends is really on the next day
@@ -1137,8 +941,8 @@ function get_start_last_slot($month, $day, $year)
     $day++;
   }
 
-  return mktime($eveningends, $eveningends_minutes, 0,
-                $month, $day, $year);
+  return mrbs_mktime($eveningends, $eveningends_minutes, 0,
+                     $month, $day, $year);
 }
 
 
@@ -1276,18 +1080,18 @@ function escape_js($str)
 // This could be changed to implement something like per-user defaults.
 function get_default_area()
 {
-  global $default_room;
+  global $tbl_area, $tbl_room, $default_room;
 
-  // It's possible that this function is being called during an upgrade
-  // process before the disabled column existed.
-  $disabled_field_exists = db()->field_exists(_tbl('room'), 'disabled');
+  // It's possible that this function is being called during
+  // an upgrade process before the disabled columns existed.
+  $disabled_field_exists = db()->field_exists($tbl_room, 'disabled');
 
   // If the $default_room is set and exists and is enabled and is visible to
   // the current user, then return the corresponding area
   if (isset($default_room) && is_visible($default_room))
   {
     $sql = "SELECT area_id
-              FROM " . _tbl('room') . " R, " . _tbl('area') . " A
+              FROM $tbl_room R, $tbl_area A
              WHERE R.id=:id
                AND R.area_id = A.id";
 
@@ -1308,16 +1112,13 @@ function get_default_area()
   // Otherwise return the first enabled area in the database that has an
   // enabled and visible room
   $sql = "SELECT R.id, R.area_id
-            FROM " . _tbl('room') . " R, " . _tbl('area') . " A
+            FROM $tbl_room R, $tbl_area A
            WHERE R.area_id = A.id";
 
   if ($disabled_field_exists)
   {
     $sql .= " AND R.disabled = 0 AND A.disabled = 0";
   }
-
-  $order_by_column = (db()->field_exists(_tbl('area'), 'sort_key')) ? 'sort_key' : 'area_name';
-  $sql .= " ORDER BY A.$order_by_column";
 
   $res = db()->query($sql);
 
@@ -1339,18 +1140,16 @@ function get_default_area()
 // This could be changed to implement something like per-user defaults.
 function get_default_room($area)
 {
-  global $default_room;
+  global $tbl_room, $default_room;
 
   // It's possible that this function is being called during
   // an upgrade process before the disabled columns existed.
-  $disabled_field_exists = db()->field_exists(_tbl('room'), 'disabled');
+  $disabled_field_exists = db()->field_exists($tbl_room, 'disabled');
 
   // Check to see whether this area contains $default_room
   if (isset($default_room))
   {
-    $sql = "SELECT id
-              FROM " . _tbl('room') . "
-             WHERE id=:id AND area_id=:area_id";
+    $sql = "SELECT id FROM $tbl_room WHERE id=:id AND area_id=:area_id";
 
     if ($disabled_field_exists)
     {
@@ -1373,17 +1172,11 @@ function get_default_room($area)
   return (count($rooms) > 0) ? $rooms[0]['id'] : 0;
 }
 
-
 // Return an area id for a given room
 function get_area($room)
 {
-  $sql = "SELECT area_id
-            FROM " . _tbl('room') . "
-           WHERE id=?
-           LIMIT 1";
-
-  $area = db()->query1($sql, array($room));
-
+  global $tbl_room;
+  $area = db()->query1("SELECT area_id FROM $tbl_room WHERE id=? LIMIT 1", array($room));
   return ($area < 0 ? 0 : $area);
 }
 
@@ -1443,6 +1236,7 @@ function clean_area_row($row)
 // If $area is empty, use the default area
 function get_area_settings($area)
 {
+  global $tbl_area;
   global $resolution, $default_duration, $default_duration_all_day;
   global $morningstarts, $morningstarts_minutes, $eveningends, $eveningends_minutes;
   global $private_enabled, $private_default, $private_mandatory, $private_override;
@@ -1452,9 +1246,7 @@ function get_area_settings($area)
   global $approval_enabled, $reminders_enabled, $enable_periods, $periods;
   global $confirmation_enabled, $confirmed_default, $timezone;
   global $max_per_interval_area_enabled, $max_per_interval_area;
-  global $max_secs_per_interval_area_enabled, $max_secs_per_interval_area;
   global $interval_types;
-  global $times_along_top, $default_type;
 
   // This code can get called during the upgrade process and so must
   // not make any assumptions about the existence of extra columns in
@@ -1479,17 +1271,11 @@ function get_area_settings($area)
                    'max_per_month_enabled', 'max_per_month',
                    'max_per_year_enabled', 'max_per_year',
                    'max_per_future_enabled', 'max_per_future',
-                   'max_secs_per_day_enabled', 'max_secs_per_day',
-                   'max_secs_per_week_enabled', 'max_secs_per_week',
-                   'max_secs_per_month_enabled', 'max_secs_per_month',
-                   'max_secs_per_year_enabled', 'max_secs_per_year',
-                   'max_secs_per_future_enabled', 'max_secs_per_future',
                    'approval_enabled', 'reminders_enabled', 'enable_periods', 'periods',
-                   'confirmation_enabled', 'confirmed_default',
-                   'times_along_top', 'default_type');
+                   'confirmation_enabled', 'confirmed_default');
 
   $sql = "SELECT *
-            FROM " . _tbl('area') . "
+            FROM $tbl_area
            WHERE id=?
            LIMIT 1";
 
@@ -1523,9 +1309,8 @@ function get_area_settings($area)
   // Set the timezone
   mrbs_default_timezone_set($timezone);
 
-  // Set the $max_per_interval_area_enabled, $max_per_interval_area,
-  // $max_secs_per_interval_area_enabled and $max_secs_per_interval_area
-  // arrays, which are handled slightly differently
+  // Set the $max_per_interval_area_enabled and $max_per_interval_area arrays,
+  // which are handled slightly differently
   foreach ($interval_types as $interval_type)
   {
     $var = "max_per_${interval_type}_enabled";
@@ -1538,18 +1323,6 @@ function get_area_settings($area)
     if (isset($$var))
     {
       $max_per_interval_area[$interval_type] = $$var;
-    }
-
-    $var = "max_secs_per_${interval_type}_enabled";
-    if (isset($$var))
-    {
-      $max_secs_per_interval_area_enabled[$interval_type] = $$var;
-    }
-
-    $var = "max_secs_per_${interval_type}";
-    if (isset($$var))
-    {
-      $max_secs_per_interval_area[$interval_type] = $$var;
     }
   }
 
@@ -1567,6 +1340,7 @@ function get_area_settings($area)
     // ensure that $morningstarts_minutes defaults to zero if not set
     $morningstarts_minutes = 0;
   }
+
 }
 
 
@@ -1591,8 +1365,10 @@ function some_area_predicate($field)
 // Returns: boolean
 function some_area($field, $enabled=false)
 {
+  global $tbl_area;
+
   $predicate = some_area_predicate($field);
-  $sql = "SELECT COUNT(*) FROM " . _tbl('area') . " WHERE $predicate";
+  $sql = "SELECT COUNT(*) FROM $tbl_area WHERE $predicate";
   $sql .= ($enabled) ? " AND disabled=0" : "";
   $sql .= " LIMIT 1";
   return (db()->query1($sql) > 0);
@@ -1664,7 +1440,7 @@ function get_rep_day_list($rep_opt)
   for ($i=0; $i<DAYS_PER_WEEK; $i++)
   {
     $daynum = ($i + $weekstarts) % DAYS_PER_WEEK;
-    if (isset($rep_opt[$daynum]) && $rep_opt[$daynum])
+    if ($rep_opt[$daynum])
     {
       $rep_days[] = day_name($daynum);
     }
@@ -1880,6 +1656,38 @@ function day_of_MRBS_week($time)
 }
 
 
+// This will return the appropriate value for isdst for mktime().
+// The order of the arguments was chosen to match those of mktime.
+// hour is added so that this function can when necessary only be
+// run if the time is between midnight and 3am (all DST changes
+// occur in this period.
+function is_dst($month, $day, $year, $hour="-1")
+{
+  if ( $hour != -1  && $hour > 3)
+  {
+    return( -1 );
+  }
+
+  // entering DST
+  if( !date( "I", mktime(12, 0, 0, $month, $day-1, $year)) &&
+      date( "I", mktime(12, 0, 0, $month, $day, $year)))
+  {
+    return( 0 );
+  }
+
+  // leaving DST
+  else if( date( "I", mktime(12, 0, 0, $month, $day-1, $year)) &&
+           !date( "I", mktime(12, 0, 0, $month, $day, $year)))
+  {
+    return( 1 );
+  }
+  else
+  {
+    return( -1 );
+  }
+}
+
+
 // Compares two nominal dates which are indexed by'hours', 'minutes', 'seconds',
 // 'mon', 'mday' and 'year', ie as in the output of getdate().  Returns -1 if the
 // first date is before the second, 0 if they are equal and +1 if the first date
@@ -2013,6 +1821,36 @@ function is_invalid_datetime($hour, $minute, $second, $month, $day, $year, $tz=n
   return $result;
 }
 
+
+// Returns TRUE if $t is in that part of daylight saving time that will have
+// the same nominal time as another timestamp shortly after the DST transition.
+// For example, will return TRUE for the $t equivalent to the first occurrence
+// of 0230 on Sunday 27th October 2013 in timezone Europe/London
+function is_dst_first_duplicate($t)
+{
+  if (date('I', $t))
+  {
+    $change = cross_dst($t, $t+SECONDS_PER_DAY);
+    return !date('I', $t + $change);
+  }
+  return false;
+}
+
+
+// A PHP version independent version of mktime().   (The $is_dst parameter
+// became deporecated at PHP 5.1.0)
+function mrbs_mktime($hour, $minute, $second, $month, $day, $year)
+{
+  if (version_compare(PHP_VERSION, '5.1.0') >= 0)
+  {
+    return mktime($hour, $minute, $second, $month, $day, $year);
+  }
+  else
+  {
+    return mktime($hour, $minute, $second, $month, $day, $year,
+                  is_dst($month, $day, $year, $hour));
+  }
+}
 
 // returns the modification (in seconds) necessary on account of any DST
 // transitions when going from $start to $end
@@ -2320,146 +2158,3 @@ function get_server_software()
 
   return '';
 }
-
-
-
-function get_field_entry_input($params)
-{
-  global $select_options, $datalist_options;
-
-  if (isset($params['field']))
-  {
-    if (!empty($select_options[$params['field']]))
-    {
-      $class = 'FieldSelect';
-    }
-    elseif (!empty($datalist_options[$params['field']]))
-    {
-      $class = 'FieldInputDatalist';
-    }
-    elseif ($params['field'] == 'entry.description')
-    {
-      $class = 'FieldTextarea';
-    }
-    else
-    {
-      $class = 'FieldInputText';
-    }
-  }
-  else
-  {
-    $class = 'FieldInputText';
-  }
-
-  $full_class = __NAMESPACE__ . "\\Form\\$class";
-  $field = new $full_class();
-  $field->setLabel($params['label'])
-    ->setControlAttribute('name', $params['name']);
-
-  if (!empty($params['required']))
-  {
-    $field->setControlAttribute('required', true);
-  }
-  if (!empty($params['disabled']))
-  {
-    $field->setControlAttribute('disabled', true);
-    $field->addHiddenInput($params['name'], $params['value']);
-  }
-
-  switch ($class)
-  {
-    case 'FieldSelect':
-      $options = $select_options[$params['field']];
-      $field->addSelectOptions($options, $params['value']);
-      break;
-
-    case 'FieldInputDatalist':
-      $options = $datalist_options[$params['field']];
-      $field->addDatalistOptions($options);
-    // Drop through
-
-    case 'FieldInputText':
-      if (!empty($params['required']))
-      {
-        // Set a pattern as well as required to prevent a string of whitespace
-        $field->setControlAttribute('pattern', REGEX_TEXT_POS);
-      }
-    // Drop through
-
-    case 'FieldTextarea':
-      if ($class == 'FieldTextarea')
-      {
-        $field->setControlText($params['value']);
-      }
-      else
-      {
-        $field->setControlAttribute('value', $params['value']);
-      }
-      if (isset($params['field']) &&
-        (null !== ($maxlength = maxlength($params['field']))))
-      {
-        $field->setControlAttribute('maxlength', $maxlength);
-      }
-      break;
-
-    default:
-      throw new \Exception("Unknown class '$class'");
-      break;
-  }
-
-  return $field;
-}
-
-
-// Returns a Field object for selecting as user from the list of available users.
-// If $datalist is true a datalist is returned, otherwise a select element.
-// $params is an associative array with the following keys
-//    value       the value of the current selection
-//    disabled    boolean, whether the field should be disabled
-//    required    boolean
-//    field       the field name, eg 'entry.create_by'
-//    label       the field label
-//    name        the field name
-function get_user_field(array $params, $datalist=false)
-{
-  if (method_exists(auth(), 'getUsernames'))
-  {
-    // We can get a list of all users, so present a <select> or <datalist> element.
-    // The options will actually be provided later via Ajax, so all we
-    // do here is present one option, ie the create_by user.
-    $options = array();
-    $selected_user = auth()->getUser($params['value']);
-    // It's possible that $selected_user no longer exists - may have left the
-    // organisation and been deleted from the user list - so in that case
-    // use their username for the displayname.
-    if (isset($selected_user))
-    {
-      $options[$selected_user->username] = $selected_user->display_name;
-    }
-    else
-    {
-      $options[$params['value']] = $params['value'];
-    }
-
-    $field = new FieldSelect();
-    $class = 'ajax_usernames';
-    if ($datalist)
-    {
-      $class .= ' datalist';
-    }
-    $field->setLabel($params['label'])
-      ->setControlAttributes(array('name'     => $params['name'],
-                                   'class'    => $class,
-                                   'disabled' => $params['disabled']))
-      ->addSelectOptions($options, $params['value'], true);
-  }
-  else
-  {
-    // We don't know all the available users, so we'll just present
-    // a text input field and rely on the user to enter a valid username.
-    $field = get_field_entry_input($params);
-  }
-
-  return $field;
-}
-

@@ -50,8 +50,6 @@ $form_vars = array(
   'area_periods'                  => 'array',
   'area_confirmation_enabled'     => 'string',
   'area_confirmed_default'        => 'string',
-  'area_default_type'             => 'string',
-  'area_times_along_top'          => 'string',
   'custom_html'                   => 'string'
 );
 
@@ -74,12 +72,6 @@ foreach ($interval_types as $interval_type)
   $var = "area_max_per_${interval_type}";
   $$var = get_form_var($var, 'int');
   $var = "area_max_per_${interval_type}_enabled";
-  $$var = get_form_var($var, 'string');
-  $var = "area_max_secs_per_${interval_type}";
-  $$var = get_form_var($var, 'int');
-  $var = "area_max_secs_per_${interval_type}_units";
-  $$var = get_form_var($var, 'string');
-  $var = "area_max_secs_per_${interval_type}_enabled";
   $$var = get_form_var($var, 'string');
 }
 
@@ -144,31 +136,25 @@ else
   }
 
   // Convert booleans into 0/1 (necessary for PostgreSQL)
-  $vars = array(
-      'area_disabled',
-      'area_def_duration_all_day',
-      'area_min_create_ahead_enabled',
-      'area_max_create_ahead_enabled',
-      'area_min_delete_ahead_enabled',
-      'area_max_delete_ahead_enabled',
-      'area_max_duration_enabled',
-      'area_private_enabled',
-      'area_private_default',
-      'area_private_mandatory',
-      'area_approval_enabled',
-      'area_reminders_enabled',
-      'area_enable_periods',
-      'area_confirmation_enabled',
-      'area_confirmed_default',
-      'area_times_along_top'
-    );
-
+  $vars = array('area_disabled',
+                'area_def_duration_all_day',
+                'area_min_create_ahead_enabled',
+                'area_max_create_ahead_enabled',
+                'area_min_delete_ahead_enabled',
+                'area_max_delete_ahead_enabled',
+                'area_max_duration_enabled',
+                'area_private_enabled',
+                'area_private_default',
+                'area_private_mandatory',
+                'area_approval_enabled',
+                'area_reminders_enabled',
+                'area_enable_periods',
+                'area_confirmation_enabled',
+                'area_confirmed_default');
   foreach ($interval_types as $interval_type)
   {
     $vars[] = "area_max_per_${interval_type}_enabled";
-    $vars[] = "area_max_secs_per_${interval_type}_enabled";
   }
-
   foreach ($vars as $var)
   {
     $$var = (!empty($$var)) ? 1 : 0;
@@ -208,17 +194,18 @@ else
 // Errors in the form data - go back to the form
 if (!empty($errors))
 {
-  $query_string = "area=$area";
+  $query_string = 'area=' . urlencode($area);
   foreach ($errors as $error)
   {
-    $query_string .= "&errors[]=$error";
+    $query_string .= '&errors[]=' . urlencode($error);
   }
-  location_header("edit_area.php?$query_string");
+  header("Location: edit_area.php?$query_string");
+  exit;
 }
 
 // Everything is OK, update the database
 
-$sql = "UPDATE " . _tbl('area') . " SET ";
+$sql = "UPDATE $tbl_area SET ";
 $sql_params = array();
 $assign_array = array();
 $assign_array[] = "area_name=?";
@@ -319,25 +306,6 @@ foreach($interval_types as $interval_type)
     $assign_array[] = "$var=?";
     $sql_params[] = $$area_var;
   }
-
-  // Now do the max_secs variables (limits on the total length of bookings)
-  $var = "max_secs_per_${interval_type}_enabled";
-  $area_var = "area_" . $var;
-  $assign_array[] = "$var=" . $$area_var;
-
-  $var = "max_secs_per_${interval_type}";
-  $area_var = "area_" . $var;
-
-  if (isset($$area_var))
-  {
-    // only update these fields if they are set;  they might be NULL because
-    // they have been disabled by JavaScript
-    // Need to convert back into seconds
-    $units_var = "area_max_secs_per_${interval_type}_units";
-    fromTimeString($$area_var, $$units_var);
-    $assign_array[] = "$var=?";
-    $sql_params[] = $$area_var;
-  }
 }
 
 $assign_array[] = "private_enabled=?";
@@ -360,10 +328,6 @@ $assign_array[] = "confirmation_enabled=?";
 $sql_params[] = $area_confirmation_enabled;
 $assign_array[] = "confirmed_default=?";
 $sql_params[] = $area_confirmed_default;
-$assign_array[] = "default_type=?";
-$sql_params[] = $area_default_type;
-$assign_array[] = "times_along_top=?";
-$sql_params[] = $area_times_along_top;
 
 $sql .= implode(",", $assign_array) . " WHERE id=?";
 $sql_params[] = $area;
@@ -372,4 +336,5 @@ db()->command($sql, $sql_params);
 
 
 // Go back to the admin page
-location_header("admin.php?day=$day&month=$month&year=$year&area=$area");
+header("Location: admin.php?day=$day&month=$month&year=$year&area=$area");
+exit();

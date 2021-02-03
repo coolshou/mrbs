@@ -1,31 +1,24 @@
 <?php
 namespace MRBS;
 
-// Returns the full table name including schema and prefix for a given table.
-// Needs to be dynamic rather than static in case we are running a multisite
-// installation and want to switch sites, eg during a database upgrade.
-function _tbl($short_name, $include_schema=true)
+global $dbsys, $db_tbl_prefix, $db_schema;
+
+$tables = array('area', 'entry', 'repeat', 'room', 'sessions', 'users', 'variables', 'zoneinfo');
+$table_vars = array();
+
+foreach ($tables as $table)
 {
-  global $dbsys, $db_tbl_prefix, $db_schema;
-
-  // Do some sanity checking
-  if (!isset($short_name))
-  {
-    throw new \Exception('$short_name not set.');
-  }
-
-  $result = $db_tbl_prefix . $short_name;
-
+  $var = 'tbl_' . $table;
+  $$var = $db_tbl_prefix . $table;
   // Prepend the schema name if set and form a qualified name for all databases
   // other than MySQL, which is one of the few that doesn't support schemas.
   // (Although in practice this means PostgreSQL at the moment, it's possible that
   // in the future support for more databases may be added)
-  if ($include_schema && (strpos($dbsys, 'mysql') === false) && isset($db_schema))
+  if ((strpos($dbsys, 'mysql') === false) && isset($db_schema))
   {
-    $result = $db_schema . '.' . $result;
+    $$var = $db_schema . '.' . $$var;
   }
-
-  return $result;
+  $table_vars[$table] = $var;
 }
 
 
@@ -51,18 +44,20 @@ function db()
 // recorded then returns 0.
 function db_schema_version()
 {
-  if (db()->table_exists(_tbl('variables')))
+  global $tbl_variables;
+  
+  if (db()->table_exists($tbl_variables))
   {
-    $result = db()->query1("SELECT variable_content
-                              FROM " . _tbl('variables') . "
-                             WHERE variable_name = 'db_version'");
+    $result = db()->query1("SELECT variable_content " .
+                             "FROM $tbl_variables " .
+                            "WHERE variable_name = 'db_version'");
   }
   else
   {
     // Default version is 0, before we had schema versions
     $result = 0;
   }
-
+  
   return max($result, 0);
 }
 
@@ -71,17 +66,19 @@ function db_schema_version()
 // recorded then returns 0.
 function db_schema_version_local()
 {
-  if (db()->table_exists(_tbl('variables')))
+  global $tbl_variables;
+  
+  if (db()->table_exists($tbl_variables))
   {
-    $result = db()->query1("SELECT variable_content
-                              FROM " . _tbl('variables') . "
-                             WHERE variable_name = 'local_db_version'");
+    $result = db()->query1("SELECT variable_content " .
+                             "FROM $tbl_variables " .
+                            "WHERE variable_name = 'local_db_version'");
   }
   else
   {
     // Default version is 0, before we had schema versions
     $result = 0;
   }
-
+  
   return max($result, 0);
 }

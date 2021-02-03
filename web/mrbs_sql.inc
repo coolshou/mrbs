@@ -49,8 +49,9 @@ function unpack_status(array &$data)
  *   nothing   - The area is free
  *   something - An error occurred, the return value is an array of conflicts
  */
-function mrbsCheckFree(array $booking, $ignore, $repignore)
+function mrbsCheckFree(array &$booking, $ignore, $repignore)
 {
+  global $tbl_entry, $tbl_room;
   global $enable_periods, $periods, $twentyfourhour_format;
   global $strftime_format, $is_private_field;
 
@@ -60,7 +61,7 @@ function mrbsCheckFree(array $booking, $ignore, $repignore)
 
   // Select any meetings which overlap for this room:
   $sql = "SELECT E.id, name, start_time, create_by, status, room_name
-            FROM " . _tbl('entry') . " E, " . _tbl('room') . " R
+            FROM $tbl_entry E, $tbl_room R
            WHERE E.room_id=R.id
              AND start_time < ?
              AND end_time > ?
@@ -140,19 +141,18 @@ function mrbsCheckFree(array $booking, $ignore, $repignore)
 }
 
 
-// Checks whether the proposed booking $booking would exceed the maximum number/length of
-// bookings in the interval of type $interval_type (can be 'day', 'week', 'month', 'year' or
-// 'future').  If $only_area is set then only the bookings in the same area are considered.
-// If $check_seconds is set then the total length of bookings is checked, otherwise the number.
+// Checks whether the proposed booking $booking would exceed the maximum number of
+// bookings in the interval of type $interval_type (can be 'day', 'week', 'month' or
+// 'year').   If $only_area is set then only the bookings in the same are considered.
 // Returns NULL if OK, otherwise an error string.
-function check_interval(array $booking, $ignore, $repignore, $interval_type='day', $only_area=false, $check_seconds=false)
+function check_interval(array &$booking, $ignore, $repignore, $interval_type='day', $only_area=FALSE)
 {
   global $max_per_interval_global, $max_per_interval_area;
-  global $max_secs_per_interval_global, $max_secs_per_interval_area;
+  global $tbl_entry, $tbl_room;
 
   // Get the area id.   We only need to do this once as all bookings will be
   // in the same area.
-  static $area_id = null;
+  static $area_id = NULL;
   if (!isset($area_id))
   {
     $area_id = get_area($booking['room_id']);
@@ -161,8 +161,6 @@ function check_interval(array $booking, $ignore, $repignore, $interval_type='day
   // Get the location for indexing the $existing and $proposed arrays.   If it's a
   // global check then $location = 0, otherwise use the area_id.
   $location = ($only_area) ? $area_id : 0;
-  // Get the check type for indexing the $existing and $proposed arrays
-  $check_type = ($check_seconds) ? 'length' : 'number';
 
   // Set up arrays recording the number of existing and proposed bookings for the interval,
   // indexed by the interval type and the Unix time at the start of that interval.  These
@@ -195,7 +193,6 @@ function check_interval(array $booking, $ignore, $repignore, $interval_type='day
       $interval_start = time();
       break;
   }
-
   while ($interval_start < $booking['end_time'])
   {
     switch ($interval_type)
@@ -217,26 +214,20 @@ function check_interval(array $booking, $ignore, $repignore, $interval_type='day
         break;
     }
 
-    if (!isset($existing[$location][$check_type][$interval_type][$interval_start]))
+    if (!isset($existing[$location][$interval_type][$interval_start]))
     {
-      $sql = "SELECT E.start_time, E.end_time
-                FROM " . _tbl('entry') . " E, " . _tbl('room') . " R, " . _tbl('area') . " A
+      $sql = "SELECT COUNT(*)
+                FROM $tbl_entry E, $tbl_room R
                WHERE E.start_time < ?
                  AND E.end_time > ?
                  AND E.create_by = ?
                  AND E.room_id = R.id
-                 AND R.area_id = A.id
                  AND R.disabled = 0";
 
       $sql_params = array($interval_end,
                           $interval_start,
                           $booking['create_by']);
 
-      if ($check_seconds)
-      {
-        // If we're checking for the actual time of bookings, then exclude areas using periods
-        $sql .= " AND A.enable_periods=0";
-      }
       if ($only_area)
       {
         $sql .= " AND R.area_id=?";
@@ -253,74 +244,25 @@ function check_interval(array $booking, $ignore, $repignore, $interval_type='day
         $sql_params[] = $repignore;
       }
 
-      $existing[$location][$check_type][$interval_type][$interval_start] = 0;
-      $proposed[$location][$check_type][$interval_type][$interval_start] = 0;
-      $res = db()->query($sql, $sql_params);
-      while (false !== ($row = $res->next_row_keyed()))
-      {
-        // If we're checking for total time we want the length of the existing booking that falls
-        // inside the interval.  Otherwise it's just one more booking.
-        if ($check_seconds)
-        {
-          $seconds = min($row['end_time'], $interval_end) - max($row['start_time'], $interval_start);
-          $existing[$location][$check_type][$interval_type][$interval_start] += $seconds;
-        }
-        else
-        {
-          $existing[$location][$check_type][$interval_type][$interval_start]++;
-        }
-      }
-    }
-
-    // If we're checking for total time we want the length of the proposed booking that falls
-    // inside the interval.  Otherwise it's just one more booking.
-    if ($check_seconds)
-    {
-      $seconds = min($booking['end_time'], $interval_end) - max($booking['start_time'], $interval_start);
-      $proposed[$location][$check_type][$interval_type][$interval_start] += $seconds;
+      $existing[$location][$interval_type][$interval_start] = db()->query1($sql, $sql_params);
+      $proposed[$location][$interval_type][$interval_start] = 1;
     }
     else
     {
-      $proposed[$location][$check_type][$interval_type][$interval_start]++;
+      $proposed[$location][$interval_type][$interval_start]++;
     }
 
-    // Check to see if the maximum number/length of bookings would be exceeded
-    if ($check_seconds)
+    $max_allowed = ($only_area) ? $max_per_interval_area[$interval_type] : $max_per_interval_global[$interval_type];
+    if (($existing[$location][$interval_type][$interval_start] + $proposed[$location][$interval_type][$interval_start]) >
+         $max_allowed)
     {
-      $max_allowed = ($only_area) ? $max_secs_per_interval_area[$interval_type] : $max_secs_per_interval_global[$interval_type];
-      if (($existing[$location][$check_type][$interval_type][$interval_start] +
-           $proposed[$location][$check_type][$interval_type][$interval_start]) >
-          $max_allowed)
+      if ($only_area)
       {
-        if ($only_area)
-        {
-          $max = $max_secs_per_interval_area[$interval_type];
-          toTimeString($max, $units);
-          return get_vocab("max_secs_per_${interval_type}_area", $max, $units);
-        }
-        else
-        {
-          $max = $max_secs_per_interval_global[$interval_type];
-          toTimeString($max, $units);
-          return get_vocab("max_secs_per_${interval_type}_global", $max, $units);
-        }
+        return get_vocab("max_per_${interval_type}_area") . " $max_per_interval_area[$interval_type]";
       }
-    }
-    else
-    {
-      $max_allowed = ($only_area) ? $max_per_interval_area[$interval_type] : $max_per_interval_global[$interval_type];
-      if (($existing[$location][$check_type][$interval_type][$interval_start] +
-           $proposed[$location][$check_type][$interval_type][$interval_start]) >
-          $max_allowed)
+      else
       {
-        if ($only_area)
-        {
-          return get_vocab("max_per_${interval_type}_area") . " $max_per_interval_area[$interval_type]";
-        }
-        else
-        {
-          return get_vocab("max_per_${interval_type}_global") . " $max_per_interval_global[$interval_type]";
-        }
+        return get_vocab("max_per_${interval_type}_global") . " $max_per_interval_global[$interval_type]";
       }
     }
 
@@ -328,7 +270,7 @@ function check_interval(array $booking, $ignore, $repignore, $interval_type='day
     $i++;
   }
 
-  return null;
+  return NULL;
 }
 
 
@@ -345,7 +287,7 @@ function check_interval(array $booking, $ignore, $repignore, $interval_type='day
  *            - An array of human readable errors, index by 'notices' or 'errors'.
  *              If there are no policy violations the array has length 0.
  */
-function mrbsCheckPolicy(array $booking, $ignore, $repignore, $delete=FALSE)
+function mrbsCheckPolicy(array &$booking, $ignore, $repignore, $delete=FALSE)
 {
   global $periods, $enable_periods;
   global $min_create_ahead_enabled, $min_create_ahead_secs;
@@ -355,10 +297,8 @@ function mrbsCheckPolicy(array $booking, $ignore, $repignore, $delete=FALSE)
   global $min_booking_date_enabled, $min_booking_date, $max_booking_date_enabled, $max_booking_date;
   global $max_duration_enabled, $max_duration_secs, $max_duration_periods;
   global $max_per_interval_global_enabled, $max_per_interval_area_enabled;
-  global $max_secs_per_interval_global_enabled, $max_secs_per_interval_area_enabled;
   global $interval_types, $strftime_format;
   global $approved_bookings_cannot_be_changed, $approval_enabled;
-  global $prevent_simultaneous_bookings, $prevent_invalid_types;
 
   $result = array('notices' => array(),
                   'errors'  => array());
@@ -415,48 +355,6 @@ function mrbsCheckPolicy(array $booking, $ignore, $repignore, $delete=FALSE)
   // Check creation policies
   else
   {
-    // Check whether the user is trying to book two rooms simultaneously
-    if ($prevent_simultaneous_bookings)
-    {
-      $sql_params = array(
-          ':end_time'   => $booking['end_time'],
-          ':start_time' => $booking['start_time'],
-          ':create_by'  => $booking['create_by']
-        );
-
-      $sql = "SELECT id
-                FROM " . _tbl('entry') . "
-               WHERE start_time < :end_time
-                 AND end_time > :start_time
-                 AND create_by = :create_by";
-
-      if ($ignore > 0)
-      {
-        $sql .= " AND id <> :ignore";
-        $sql_params[':ignore'] = $ignore;
-      }
-
-      $sql .= " LIMIT 1";
-
-      $res = db()->query($sql, $sql_params);
-
-      if ($res->count() > 0)
-      {
-        $violations[] = get_vocab('no_simultaneous_bookings');
-      }
-    }
-
-    // Check whether this booking type is allowed in this room
-    if ($prevent_invalid_types)
-    {
-      $room_details = get_room_details($booking['room_id']);
-      if (isset($room_details['invalid_types']) &&
-          in_array($booking['type'], $room_details['invalid_types']))
-      {
-        $violations[] = get_vocab('type_not_allowed', get_type_vocab($booking['type']), $room_details['room_name']);
-      }
-    }
-
     if ($min_create_ahead_enabled)
     {
       if ($enable_periods)
@@ -561,7 +459,6 @@ function mrbsCheckPolicy(array $booking, $ignore, $repignore, $delete=FALSE)
   foreach ($interval_types as $interval_type)
   {
     // globally
-    // number of bookings
     if (!empty($max_per_interval_global_enabled[$interval_type]) && !$delete)
     {
       $tmp = check_interval($booking, $ignore, $repignore, $interval_type, false);
@@ -570,29 +467,10 @@ function mrbsCheckPolicy(array $booking, $ignore, $repignore, $delete=FALSE)
         $violations[] = $tmp;
       }
     }
-    // length of bookings
-    if (!empty($max_secs_per_interval_global_enabled[$interval_type]) && !$delete)
-    {
-      $tmp = check_interval($booking, $ignore, $repignore, $interval_type, false, true);
-      if (isset($tmp))
-      {
-        $violations[] = $tmp;
-      }
-    }
     // for the area
-    // number of bookings
     if (!empty($max_per_interval_area_enabled[$interval_type]) && !$delete)
     {
       $tmp = check_interval($booking, $ignore, $repignore, $interval_type, true);
-      if (isset($tmp))
-      {
-        $violations[] = $tmp;
-      }
-    }
-    // length of bookings
-    if (!empty($max_secs_per_interval_area_enabled[$interval_type]) && !$delete)
-    {
-      $tmp = check_interval($booking, $ignore, $repignore, $interval_type, true, true);
       if (isset($tmp))
       {
         $violations[] = $tmp;
@@ -608,28 +486,24 @@ function mrbsCheckPolicy(array $booking, $ignore, $repignore, $delete=FALSE)
 
 function get_entry_by_id($id)
 {
+  global $tbl_entry;
+
   if (!isset($id))
   {
     return null;
   }
 
   $sql = "SELECT *
-            FROM " . _tbl('entry') . "
+            FROM $tbl_entry
            WHERE id=?
            LIMIT 1";
 
   $res = db()->query($sql, array($id));
 
-  if ($res->count() == 0)
-  {
-    $result = null;
-  }
-  else
-  {
-    $result = $res->next_row_keyed();
-    // Unpack the status bits
-    unpack_status($result);
-  }
+  $result = ($res->count() == 0) ? null : $res->next_row_keyed();
+
+  // Unpack the status bits
+  unpack_status($result);
 
   return $result;
 }
@@ -641,15 +515,14 @@ function get_entry_by_id($id)
 // corresponding to the entry table columns
 function get_entries_by_area($area_id, $interval_start, $interval_end)
 {
-  // The GROUP BY is necessary to get n_registered to work
-  $sql = "SELECT E.*, COUNT(P.entry_id) AS n_registered
-            FROM " . _tbl('entry') . " E
-       LEFT JOIN " . _tbl('room') . " R ON E.room_id = R.id
-       LEFT JOIN " . _tbl('participants') . " P ON P.entry_id = E.id
-           WHERE R.area_id = ?
+  global $tbl_entry, $tbl_room;
+
+  $sql = "SELECT E.*
+            FROM $tbl_entry E, $tbl_room R
+           WHERE E.room_id = R.id
+             AND R.area_id = ?
              AND R.disabled = 0
              AND start_time < ? AND end_time > ?
-        GROUP BY E.id
         ORDER BY start_time, E.id";   // necessary so that multiple bookings appear in the right order
 
   $res = db()->query($sql, array($area_id, $interval_end, $interval_start));
@@ -672,13 +545,12 @@ function get_entries_by_area($area_id, $interval_start, $interval_end)
 // corresponding to the entry table columns
 function get_entries_by_room($room_id, $interval_start, $interval_end)
 {
-  // The GROUP BY is necessary to get n_registered to work
-  $sql = "SELECT E.*, COUNT(P.entry_id) AS n_registered
-            FROM " . _tbl('entry') . " E
-       LEFT JOIN " . _tbl('participants') . " P ON P.entry_id = E.id
+  global $tbl_entry;
+
+  $sql = "SELECT *
+            FROM $tbl_entry
            WHERE room_id = ?
              AND start_time < ? AND end_time > ?
-        GROUP BY E.id
         ORDER BY start_time, id";   // necessary so that multiple bookings appear in the right order
 
   $res = db()->query($sql, array($room_id, $interval_end,  $interval_start));
@@ -696,14 +568,16 @@ function get_entries_by_room($room_id, $interval_start, $interval_end)
 
 
 // Get the number of outstanding (ie waiting to be approved) for a user
-function get_entries_n_outstanding(User $user)
+function get_entries_n_outstanding($user)
 {
+  global $tbl_entry, $tbl_room, $tbl_area;
+
   $sql_approval_enabled = some_area_predicate('approval_enabled');
 
   // Find out how many bookings are awaiting approval
   // (but only for areas where approval is required)
   $sql = "SELECT room_id, create_by
-            FROM " . _tbl('entry') . " E, " . _tbl('room') . " R, " . _tbl('area') . " A
+            FROM $tbl_entry E, $tbl_room R, $tbl_area A
            WHERE (status&" . STATUS_AWAITING_APPROVAL . " != 0)
              AND E.room_id = R.id
              AND R.area_id = A.id
@@ -719,7 +593,7 @@ function get_entries_n_outstanding(User $user)
   // for which this user is a booking admin.
   while (false !== ($row = $res->next_row_keyed()))
   {
-    if ((strcasecmp($row['create_by'], $user->username) === 0) || is_book_admin($row['room_id']))
+    if ((strcasecmp($row['create_by'], $user) === 0) || is_book_admin($row['room_id']))
     {
       $result++;
     }
@@ -744,14 +618,12 @@ function get_entries_n_outstanding(User $user)
  */
 function mrbsDelEntry($id, $series, $all)
 {
+  global $tbl_entry, $tbl_repeat;
+
   $start_times = array();
 
   // Get the repeat_id and room_id for this entry
-  $sql = "SELECT repeat_id, room_id
-            FROM " . _tbl('entry') . "
-           WHERE id=?
-           LIMIT 1";
-  $res = db()->query($sql, array($id));
+  $res = db()->query("SELECT repeat_id, room_id FROM $tbl_entry WHERE id=? LIMIT 1", array($id));
   if ($res->count() <= 0)
   {
     return FALSE;
@@ -760,7 +632,7 @@ function mrbsDelEntry($id, $series, $all)
   $repeat_id = $row['repeat_id'];
   $room_id = $row['room_id'];
 
-  $sql = "SELECT * FROM " . _tbl('entry') . " WHERE ";
+  $sql = "SELECT * FROM $tbl_entry WHERE ";
 
   $sql_params = array();
 
@@ -796,8 +668,7 @@ function mrbsDelEntry($id, $series, $all)
 
     if (empty($tmp['errors']))
     {
-      $sql = "DELETE FROM " . _tbl('entry') . " WHERE id=?";
-      if (db()->command($sql, array($row['id'])) > 0)
+      if (db()->command("DELETE FROM $tbl_entry WHERE id=?", array($row['id'])) > 0)
       {
         $start_times[] = $row['start_time'];
       }
@@ -805,13 +676,10 @@ function mrbsDelEntry($id, $series, $all)
   }
 
   // Get rid of any orphaned rows in the repeat table
-  $sql = "SELECT COUNT(*)
-            FROM " . _tbl('entry') . "
-           WHERE repeat_id=?";
-  if (!empty($repeat_id) && (db()->query1($sql, array($repeat_id)) == 0))
+  if (!empty($repeat_id) &&
+      db()->query1("SELECT COUNT(*) FROM $tbl_entry WHERE repeat_id=?",array($repeat_id)) == 0)
   {
-    $sql = "DELETE FROM " . _tbl('repeat') . " WHERE id=?";
-    db()->command($sql, array($repeat_id));
+    db()->command("DELETE FROM $tbl_repeat WHERE id=?",array($repeat_id));
   }
 
   asort($start_times);
@@ -865,17 +733,6 @@ function mrbsCreateEntry($table, $data)
     {
       switch ($key)
       {
-        // booleans
-        case 'allow_registration':
-        case 'enable_registrant_limit':
-          if (isset($data[$key]))
-          {
-            $sql_col[] = $key;
-            $sql_val[] = '?';
-            $sql_params[] = ($data[$key]) ? 1 : 0;
-          }
-          break;
-
         // integers
         case 'start_time':
         case 'end_time':
@@ -890,16 +747,6 @@ function mrbsCreateEntry($table, $data)
           $sql_col[] = $key;
           $sql_val[] = '?';
           $sql_params[] = (isset($data[$key])) ? (int)$data[$key] : null;
-          break;
-
-        // integers NOT NULL
-        case 'registrant_limit':
-          if (isset($data[$key]))
-          {
-            $sql_col[] = $key;
-            $sql_val[] = '?';
-            $sql_params[] = (int)$data[$key];
-          }
           break;
 
         // strings
@@ -921,7 +768,7 @@ function mrbsCreateEntry($table, $data)
           // pgsql doesn't like empty strings
           $sql_col[] = $key;
           $sql_val[] = '?';
-          $sql_params[] = (empty($data[$key])) ? '0' : $data[$key];
+          $sql_params[] = (empty($data[$key])) ? "'0'" : $data[$key];
           break;
 
         // special case - rep_interval
@@ -1002,8 +849,10 @@ function mrbsCreateEntry($table, $data)
  */
 function mrbsCreateSingleEntry(array $data)
 {
-  // Make sure that any entry is of a positive duration.
-  // This is to trap potential negative duration created when DST comes
+  global $tbl_entry;
+
+  // make sure that any entry is of a positive duration
+  // this is to trap potential negative duration created when DST comes
   // into effect
   if ($data['end_time'] > $data['start_time'])
   {
@@ -1014,7 +863,8 @@ function mrbsCreateSingleEntry(array $data)
     {
       $data['ical_recur_id'] = gmdate(RFC5545_FORMAT . '\Z', $data['start_time']);
     }
-    return mrbsCreateEntry(_tbl('entry'), $data);
+    $result = mrbsCreateEntry($tbl_entry, $data);
+    return $result;
   }
   else
   {
@@ -1034,7 +884,10 @@ function mrbsCreateSingleEntry(array $data)
  */
 function mrbsCreateRepeatEntry(array $data)
 {
-  return mrbsCreateEntry(_tbl('repeat'), $data);
+  global $tbl_repeat;
+
+  $result = mrbsCreateEntry($tbl_repeat, $data);
+  return $result;
 }
 
 
@@ -1309,8 +1162,10 @@ function mrbsCreateRepeatingEntrys(array $data)
 // Returns the repeat_id or NULL
 function get_repeat_id($entry_id)
 {
+  global $tbl_entry;
+
   $sql = "SELECT repeat_id
-            FROM " . _tbl('entry') . "
+            FROM $tbl_entry
            WHERE id=?
            LIMIT 1";
 
@@ -1338,16 +1193,18 @@ function get_repeat_id($entry_id)
 // Returns -1 on error; use the DB class error() method to get the error message.
 function update_last_reminded($id, $series)
 {
+  global $tbl_entry, $tbl_repeat;
+
   $now = time();
   if ($series)
   {
-    $sql = "UPDATE " . _tbl('repeat') . "
+    $sql = "UPDATE $tbl_repeat
                SET reminded=?,
                    ical_sequence=ical_sequence+1
              WHERE id=?";
     db()->command($sql, array($now, $id));
 
-    $sql = "UPDATE " . _tbl('entry') . "
+    $sql = "UPDATE $tbl_entry
                SET reminded=?,
                    ical_sequence=ical_sequence+1
              WHERE repeat_id=?";
@@ -1355,7 +1212,7 @@ function update_last_reminded($id, $series)
   }
   else
   {
-    $sql = "UPDATE " . _tbl('entry') . "
+    $sql = "UPDATE $tbl_entry
                SET reminded=?,
                    ical_sequence=ical_sequence+1
              WHERE id=?";
@@ -1364,7 +1221,7 @@ function update_last_reminded($id, $series)
       $repeat_id = get_repeat_id($id);
       if (isset($repeat_id))
       {
-        $sql = "UPDATE " . _tbl('repeat') . "
+        $sql = "UPDATE $tbl_repeat
                    SET reminded=?,
                        ical_sequence=ical_sequence+1
                  WHERE id=?";
@@ -1387,7 +1244,9 @@ function update_last_reminded($id, $series)
 // message.
 function update_more_info($id, $series, $user, $note)
 {
-  $table = ($series) ? _tbl('repeat') : _tbl('entry');
+  global $tbl_entry, $tbl_repeat;
+
+  $table = ($series) ? $tbl_repeat : $tbl_entry;
   $now = time();
 
   $sql_params = array();
@@ -1416,10 +1275,12 @@ function update_more_info($id, $series, $user, $note)
 // have been approved
 function mrbsApproveEntry($id, $series)
 {
+  global $tbl_entry, $tbl_repeat;
+
   if ($series)
   {
     // First update the repeat table if it's a series
-    $sql = "UPDATE " . _tbl('repeat') . "
+    $sql = "UPDATE $tbl_repeat
                SET status=status&(~" . STATUS_AWAITING_APPROVAL . "),
                    ical_sequence=ical_sequence+1
              WHERE id=?";  // PostgreSQL does not support LIMIT with UPDATE
@@ -1435,13 +1296,13 @@ function mrbsApproveEntry($id, $series)
   $condition = "$id_column=? AND status&" . STATUS_AWAITING_APPROVAL . "!=0";
   $sql_params = array($id);
   $sql = "SELECT start_time
-            FROM " . _tbl('entry') . "
+            FROM $tbl_entry
            WHERE $condition";
   $start_times = db()->query_array($sql, $sql_params);
 
   if (($start_times !== FALSE) && (count($start_times) != 0))
   {
-    $sql = "UPDATE " . _tbl('entry') . "
+    $sql = "UPDATE $tbl_entry
                SET status=status&(~" . STATUS_AWAITING_APPROVAL . "),
                    ical_sequence=ical_sequence+1
              WHERE $condition";  // PostgreSQL does not support LIMIT with UPDATE
@@ -1458,67 +1319,6 @@ function mrbsApproveEntry($id, $series)
 }
 
 
-function get_registration_by_id($id)
-{
-  if (!isset($id))
-  {
-    return null;
-  }
-
-  $sql = "SELECT *
-            FROM " . _tbl('participants') . "
-           WHERE id=?
-           LIMIT 1";
-
-  $res = db()->query($sql, array($id));
-
-  if ($res->count() == 0)
-  {
-    $result = null;
-  }
-  else
-  {
-    $result = $res->next_row_keyed();
-  }
-
-  return $result;
-}
-
-
-// Get the people registered for an event
-function get_registrants($id, $series)
-{
-  // You can't register for a series (yet)
-  if ($series)
-  {
-    return null;
-  }
-
-  $sql = "SELECT *
-            FROM " . _tbl('participants') . "
-           WHERE entry_id=:entry_id";
-
-  $res = db()->query($sql, array(':entry_id' => $id));
-
-  return $res->all_rows_keyed();
-}
-
-
-// Check whether any entries in a series have users registered
-function series_has_registrants($repeat_id)
-{
-  $sql = "SELECT COUNT(username)
-            FROM " . _tbl('entry') . " E
-       LEFT JOIN " . _tbl('participants') . " P ON E.id=P.entry_id
-           WHERE E.repeat_id=:repeat_id
-           LIMIT 1";
-
-  $sql_params = array(':repeat_id' => $repeat_id);
-
-  return (db()->query1($sql, $sql_params) > 0);
-}
-
-
 // get_booking_info($id, $series)
 //
 // Gets all the details for a booking with $id, which is in the
@@ -1529,6 +1329,8 @@ function series_has_registrants($repeat_id)
 // unless $silent is TRUE, when it returns FALSE.
 function get_booking_info($id, $series, $silent=FALSE)
 {
+  global $tbl_entry, $tbl_repeat, $tbl_room, $tbl_area;
+
   // Check that we've got an id
   if (!isset($id))
   {
@@ -1543,12 +1345,12 @@ function get_booking_info($id, $series, $silent=FALSE)
     }
   }
 
-  $table = ($series) ? _tbl('repeat') : _tbl('entry');
+  $table = ($series) ? $tbl_repeat : $tbl_entry;
   $table_fields = db()->field_info($table);
 
   // Build an array of the field names in the repeat table so that
   // we'll be able to do some sanity checking later
-  $repeat_fields = db()->field_info(_tbl('repeat'));
+  $repeat_fields = db()->field_info($tbl_repeat);
   $rep_fields = array();
   foreach ($repeat_fields as $field)
   {
@@ -1573,9 +1375,6 @@ function get_booking_info($id, $series, $silent=FALSE)
       case 'entry_type':
       case 'repeat_id':
       case 'ical_recur_id':
-      case 'allow_registration':
-      case 'enable_registrant_limit':
-      case 'registrant_limit':
         array_push($terms, $field['name']);
         break;
 
@@ -1613,7 +1412,7 @@ function get_booking_info($id, $series, $silent=FALSE)
   }
 
   $sql = "SELECT " . implode(", ",$terms)."
-            FROM $table T, " . _tbl('room') . " M, " . _tbl('area') . " A
+            FROM $table T, $tbl_room M, $tbl_area A
            WHERE T.room_id = M.id
              AND M.area_id = A.id
              AND T.id=?";
@@ -1666,8 +1465,6 @@ function get_booking_info($id, $series, $silent=FALSE)
   unpack_status($row);
 
   // Get some extra information
-  $row['registrants'] = get_registrants($id, $series);
-
   if ($series)
   {
     $row['entry_info_time'] = '';
@@ -1686,13 +1483,9 @@ function get_booking_info($id, $series, $silent=FALSE)
     }
     else
     {
-      $sql = "SELECT rep_type, end_date, rep_opt, rep_interval, month_absolute, month_relative,
-                     info_time AS repeat_info_time, info_user AS repeat_info_user,
-                     info_text AS repeat_info_text
-                FROM " . _tbl('repeat') . "
-               WHERE id=?
-               LIMIT 1";
-      $res = db()->query($sql, array($row['repeat_id']));
+      $res = db()->query("SELECT rep_type, end_date, rep_opt, rep_interval, month_absolute, month_relative,
+                        info_time AS repeat_info_time, info_user AS repeat_info_user, info_text AS repeat_info_text
+                        FROM $tbl_repeat WHERE id=? LIMIT 1", array($row['repeat_id']));
 
       if (!$extra_row = $res->next_row_keyed())
       {
@@ -1733,10 +1526,12 @@ function get_booking_info($id, $series, $silent=FALSE)
 // Returns FALSE if there is an error, NULL if the id does not exist
 function get_area_name($id, $all=FALSE)
 {
+  global $tbl_area;
+
   $id = (int)$id;
 
   $sql = "SELECT area_name
-            FROM " . _tbl('area') . "
+            FROM $tbl_area
            WHERE id=?";
   if (empty($all))
   {
@@ -1755,9 +1550,11 @@ function get_area_name($id, $all=FALSE)
 // are not disabled
 function get_area_names($all=FALSE)
 {
+  global $tbl_area;
+
   $areas = array();
 
-  $sql = "SELECT id, area_name FROM " . _tbl('area');
+  $sql = "SELECT id, area_name FROM $tbl_area";
   if (empty($all))
   {
     $sql .= " WHERE disabled=0";
@@ -1779,8 +1576,10 @@ function get_area_names($all=FALSE)
 // Returns NULL if $area_id does not exist.
 function get_area_details($area_id)
 {
+  global $tbl_area;
+
   $sql = "SELECT *
-            FROM " . _tbl('area') . "
+            FROM $tbl_area
            WHERE id=?
            LIMIT 1";
 
@@ -1795,10 +1594,12 @@ function get_area_details($area_id)
 // Returns NULL if the id does not exist
 function get_room_name($room_id, $all=FALSE)
 {
+  global $tbl_room, $tbl_area;
+
   $room_id = (int)$room_id;
 
   $sql = "SELECT room_name
-            FROM " . _tbl('room') . " R, " . _tbl('area') . " A
+            FROM $tbl_room R, $tbl_area A
            WHERE R.id=?
              AND R.area_id=A.id";
 
@@ -1819,10 +1620,12 @@ function get_room_name($room_id, $all=FALSE)
 // are not disabled
 function get_room_names($area_id, $all=FALSE)
 {
+  global $tbl_room;
+
   $rooms = array();
 
   $sql = "SELECT id, room_name
-            FROM " . _tbl('room') . "
+            FROM $tbl_room
            WHERE area_id = :area_id";
   if (empty($all))
   {
@@ -1848,27 +1651,21 @@ function get_room_names($area_id, $all=FALSE)
 // Returns FALSE on error, NULL if $room_id does not exist or is invisible.
 function get_room_details($room_id)
 {
+  global $tbl_room;
+
   if (!is_visible($room_id))
   {
     return null;
   }
 
   $sql = "SELECT *
-            FROM " . _tbl('room') . "
+            FROM $tbl_room
            WHERE id=?
            LIMIT 1";
 
   $res = db()->query($sql, array($room_id));
 
-  $details = ($res->count() == 0) ? null : $res->next_row_keyed();
-
-  // The invalid types column is json_encoded
-  if (isset($details['invalid_types']))
-  {
-    $details['invalid_types'] = json_decode($details['invalid_types']);
-  }
-
-  return $details;
+  return ($res->count() == 0) ? null : $res->next_row_keyed();
 }
 
 
@@ -1879,8 +1676,10 @@ function get_room_details($room_id)
 // otherwise just the ones that are visible to the current user.
 function get_rooms($area, $include_disabled=false, $include_invisible=false)
 {
+  global $tbl_room, $tbl_area;
+
   $sql = "SELECT R.*
-            FROM " . _tbl('room') . " R, " . _tbl('area') . " A
+            FROM $tbl_room R, $tbl_area A
            WHERE R.area_id=?
            AND R.area_id = A.id";
 
@@ -1890,12 +1689,7 @@ function get_rooms($area, $include_disabled=false, $include_invisible=false)
             " AND A.disabled = 0";
   }
 
-  // In early versions of MRBS the sort_key field didn't exist and this function
-  // is called before the database can be upgraded.
-  if (db()->field_exists(_tbl('room'), 'sort_key'))
-  {
-    $sql .= " ORDER BY R.sort_key";
-  }
+  $sql .= " ORDER BY R.sort_key";
 
   $res = db()->query($sql, array($area));
 
@@ -1905,10 +1699,6 @@ function get_rooms($area, $include_disabled=false, $include_invisible=false)
   {
     if ($include_invisible || is_visible($row['id']))
     {
-      if (isset($row['invalid_types']))
-      {
-        $row['invalid_types'] = json_decode($row['invalid_types']);
-      }
       $result[] = $row;
     }
   }
@@ -1920,7 +1710,9 @@ function get_rooms($area, $include_disabled=false, $include_invisible=false)
 // Gets the ids of all the invisible rooms in the system
 function get_invisible_room_ids()
 {
-  $sql = "SELECT id FROM " . _tbl('room');
+  global $tbl_room;
+
+  $sql = "SELECT id FROM $tbl_room";
 
   $res = db()->query($sql);
 
@@ -1941,6 +1733,8 @@ function get_invisible_room_ids()
 // Gets a two-dimensional array of period names indexed by area id.
 function get_period_names()
 {
+  global $tbl_area;
+
   static $period_names = null;
 
   if (isset($period_names))
@@ -1950,7 +1744,7 @@ function get_period_names()
 
   $period_names = array();
 
-  $sql = "SELECT id, periods FROM " . _tbl('area');
+  $sql = "SELECT id, periods FROM $tbl_area";
 
   $res = db()->query($sql);
 
@@ -1965,12 +1759,9 @@ function get_period_names()
 
 function mrbsGetRoomArea($id)
 {
-  $sql = "SELECT area_id
-            FROM " . _tbl('room') . "
-           WHERE id=?
-           LIMIT 1";
+  global $tbl_room;
 
-  $id = db()->query1($sql, array($id));
+  $id = db()->query1("SELECT area_id FROM $tbl_room WHERE id=? LIMIT 1", array($id));
 
   return ($id <= 0) ? 0 : $id;
 }
@@ -1980,7 +1771,7 @@ function mrbsGetRoomArea($id)
 // error in $error
 function mrbsAddArea($name, &$error)
 {
-  global $area_defaults, $boolean_fields;
+  global $tbl_area, $area_defaults, $boolean_fields;
 
   // First of all check that we've got a name
   if (!isset($name) || ($name === ''))
@@ -1992,18 +1783,14 @@ function mrbsAddArea($name, &$error)
   // Truncate the name field to the maximum length as a precaution.
   $name = utf8_substr($name, 0, maxlength('area.area_name'));
   // Acquire a mutex to lock out others who might be editing the area
-  if (!db()->mutex_lock(_tbl('area')))
+  if (!db()->mutex_lock($tbl_area))
   {
     fatal_error(get_vocab("failed_to_acquire"));
   }
   // Check that the area name is unique
-  $sql = "SELECT COUNT(*)
-            FROM " . _tbl('area') . "
-           WHERE area_name=?
-           LIMIT 1";
-  if (db()->query1($sql, array($name)) > 0)
+  if (db()->query1("SELECT COUNT(*) FROM $tbl_area WHERE area_name=? LIMIT 1", array($name)) > 0)
   {
-    db()->mutex_unlock(_tbl('area'));
+    db()->mutex_unlock($tbl_area);
     $error = "invalid_area_name";
     return FALSE;
   }
@@ -2015,7 +1802,7 @@ function mrbsAddArea($name, &$error)
   $sql_col = array();
   $sql_val = array();
   // Get the information about the fields in the room table
-  $fields = db()->field_info(_tbl('area'));
+  $fields = db()->field_info($tbl_area);
   // Loop through the fields and build up the arrays
   foreach ($fields as $field)
   {
@@ -2050,14 +1837,12 @@ function mrbsAddArea($name, &$error)
       break;
     }
   }
-
-  $sql = "INSERT INTO " . _tbl('area') . " (" . implode(', ',$sql_col) . ")
-               VALUES (" . implode(', ',$sql_val) . ")";
+  $sql = "INSERT INTO $tbl_area (" . implode(', ',$sql_col) . ") VALUES (" . implode(', ',$sql_val) . ")";
   db()->command($sql, $sql_params);
-  $area = db()->insert_id(_tbl('area'), 'id');
+  $area = db()->insert_id($tbl_area, 'id');
 
   // Release the mutex
-  db()->mutex_unlock(_tbl('area'));
+  db()->mutex_unlock($tbl_area);
   return $area;
 }
 
@@ -2066,6 +1851,8 @@ function mrbsAddArea($name, &$error)
 // error in $error
 function mrbsAddRoom($name, $area, &$error, $description='', $capacity='', $room_admin_email='')
 {
+  global $tbl_room;
+
   // First of all check that we've got a name
   if (!isset($name) || ($name === ''))
   {
@@ -2082,54 +1869,28 @@ function mrbsAddRoom($name, $area, &$error, $description='', $capacity='', $room
     $capacity = 0;
   }
   // Acquire a mutex to lock out others who might be editing rooms
-  if (!db()->mutex_lock(_tbl('room')))
+  if (!db()->mutex_lock($tbl_room))
   {
     fatal_error(get_vocab("failed_to_acquire"));
   }
   // Check that the room name is unique within the area
-  $sql = "SELECT COUNT(*)
-            FROM " . _tbl('room') . "
-           WHERE room_name=? AND area_id=?
-           LIMIT 1";
-  if (db()->query1($sql, array($name, $area)) > 0)
+  if (db()->query1("SELECT COUNT(*) FROM $tbl_room WHERE room_name=? AND area_id=? LIMIT 1",
+                   array($name, $area)) > 0)
   {
-    db()->mutex_unlock(_tbl('room'));
+    db()->mutex_unlock($tbl_room);
     $error = "invalid_room_name";
     return FALSE;
   }
   // If so, insert the room into the database
-  $sql = "INSERT INTO " . _tbl('room') . " (room_name, sort_key, area_id, description, capacity, room_admin_email)
+  $sql = "INSERT INTO $tbl_room (room_name, sort_key, area_id, description, capacity, room_admin_email)
           VALUES (?, ?, ?, ?, ?, ?)";
   db()->command($sql, array($name,$name,$area,$description,$capacity,$room_admin_email));
-  $room = db()->insert_id(_tbl('room'), 'id');
+  $room = db()->insert_id($tbl_room, 'id');
 
   // Release the mutex
-  db()->mutex_unlock(_tbl('room'));
+  db()->mutex_unlock($tbl_room);
   return $room;
 }
-
-
-function update_participants($old_id, $new_id)
-{
-  $sql = "UPDATE " . _tbl('participants') . "
-             SET entry_id=:new_id
-           WHERE entry_id=:old_id";
-
-  $sql_params = array(':new_id' => $new_id, ':old_id' => $old_id);
-
-  try
-  {
-    db()->command($sql, $sql_params);
-  }
-  catch (DBException $exception)
-  {
-    trigger_error($exception->getMessage(), E_USER_WARNING);
-    return false;
-  }
-
-  return true;
-}
-
 
 
 // Makes bookings
@@ -2138,7 +1899,7 @@ function update_participants($old_id, $new_id)
 function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FALSE, $original_room_id=NULL, $send_mail=FALSE, $edit_type='')
 {
   global $max_rep_entrys, $enable_periods, $resolution, $mail_settings;
-  global $prevent_simultaneous_bookings;
+  global $tbl_room, $tbl_area;
 
   // All the data, except for the status and room id, will be common
   // across the bookings
@@ -2192,42 +1953,16 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
   else
   {
     $ignore_id = 0;
-    $repeat_id = null;
+    $repeat_id = NULL;
   }
 
   // Validate the booking for (a) conflicting bookings and (b) conformance to policy rules
-  $valid_booking = true;
+  $valid_booking = TRUE;
   $conflicts  = array();                      // Holds a list of all the conflicts
   $violations = array('notices' => array(),   // Holds an array of the policy rules that have been broken
                       'errors'  => array());  // classified by 'notices' and 'errors'
   $skip_lists = array();    // Holds a 2D array of bookings to skip past.  Indexed
                             // by room id and start time
-
-  // Do the simple check for simultaneous bookings: if there is more than one booking
-  // then this is going to result in a simultaneous booking.  The only question is whether
-  // this a notice or an error.  If the user is an ordinary user in more than one of
-  // the rooms, then it's an error, otherwise a notice.
-  // The policy check later on will check whether the booking is at the same time as
-  // any other bookings made by this user.
-  if ($prevent_simultaneous_bookings && (count($bookings) > 1))
-  {
-    $violation_status = 'notices';
-    $non_admin_rooms = 0;
-    foreach($bookings as $booking)
-    {
-      if (!is_book_admin($booking['room_id']))
-      {
-        $non_admin_rooms++;
-        if ($non_admin_rooms > 1)
-        {
-          $violation_status = 'errors';
-          $valid_booking = false;
-          break;
-        }
-      }
-    }
-    $violations[$violation_status][] = get_vocab('no_simultaneous_bookings');
-  }
 
   // Check for any schedule conflicts in each room we're going to try and
   // book in;  also check that the booking conforms to the policy
@@ -2240,22 +1975,14 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
       {
         for ($i = 0; $i < count($reps); $i++)
         {
-          // Calculate diff each time and correct where events cross DST
+          // calculate diff each time and correct where events
+          // cross DST
           $diff = $duration_seconds;
           $diff += cross_dst($reps[$i], $reps[$i] + $diff);
 
           $this_booking = $booking;
           $this_booking['start_time'] = $reps[$i];
           $this_booking['end_time'] = $reps[$i] + $diff;
-
-          // Check that this entry doesn't overlap with the next in the series.
-          // (This can happen if people mistake the end date for the repeat end date.)
-          if (isset($reps[$i+1]) && ($this_booking['end_time'] > $reps[$i+1]))
-          {
-            $valid_booking = false;
-            $conflicts[] = get_vocab('conflicts_with_self');
-            break;
-          }
 
           $tmp = mrbsCheckFree($this_booking, $ignore_id, $repeat_id);
 
@@ -2299,16 +2026,8 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
       }
       else
       {
-        if (is_book_admin($booking['room_id']))
-        {
-          $violation_status = 'notices';
-        }
-        else
-        {
-          $violation_status = 'errors';
-          $valid_booking = false;
-        }
-        $violations[$violation_status][] = get_vocab("too_many_entries", $max_rep_entrys - 1);
+        $valid_booking = FALSE;
+        $violations[] = get_vocab("too_may_entrys");
       }
     }
     else
@@ -2374,6 +2093,7 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
   $result['valid_booking'] = $valid_booking;
   $result['violations'] = $violations;
   $result['conflicts'] = $conflicts;
+
   // If we've just been asked to check the bookings, or if it wasn't a valid
   // booking, then stop here and return the results
   if ($just_check || !$valid_booking)
@@ -2455,12 +2175,6 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
     {
       // Create the entry:
       $new_id = mrbsCreateSingleEntry($booking);
-      // Update the participants table
-      if (isset($id))
-      {
-        update_participants($id, $new_id);
-      }
-
       $is_repeat_table = FALSE;
       $result['start_times'] = array($booking['start_time']);
     }
@@ -2479,7 +2193,7 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
 
         // Get room name and area name for email notifications.
         $sql = "SELECT R.room_name, A.area_name
-                  FROM " . _tbl('room') . " R, " . _tbl('area') . " A
+                  FROM $tbl_room R, $tbl_area A
                  WHERE R.id=? AND R.area_id = A.id
                  LIMIT 1";
         $res = db()->query($sql, array($booking['room_id']));
@@ -2519,11 +2233,11 @@ function mrbsMakeBookings(array $bookings, $id=NULL, $just_check=FALSE, $skip=FA
 
 function get_bookings_in_series($repeat_id)
 {
+  global $tbl_entry;
+
   $bookings = array();
 
-  $sql = "SELECT id
-           FROM " . _tbl('entry') . "
-          WHERE repeat_id = ?";
+  $sql = "SELECT id FROM $tbl_entry WHERE repeat_id = ?";
   $res = db()->query_array($sql, array($repeat_id));
 
   foreach ($res as $id)
@@ -2532,4 +2246,54 @@ function get_bookings_in_series($repeat_id)
   }
 
   return $bookings;
+}
+
+//jimmy
+function get_holidays($year){
+    /*get holidays of the $year*/
+    //TODO:  get this year's holiday, ID=1 (Taiwan)
+    $holidays = array();
+    //$holiday = array();
+    //$sql = "SELECT Date,Name FROM `mrbs_holiday` WHERE YEAR(Date) = YEAR(CURDATE()) ";
+    $sql = "SELECT Date,Name FROM `mrbs_holiday` WHERE YEAR(Date) = $year";
+    $res = db()->query($sql);
+    while (false !== ($row = $res->next_row_keyed()))
+    {
+        //$holiday['Date'] = $row['Date'];
+        //$holiday['Name'] = $row['Name'];
+        //echo "date: $row['Date'] <br/>";
+        array_push($holidays, $row['Date'].",".$row['Name']);
+        //array_push($holidays, $holiday);
+    }
+    /*
+    foreach ($holidays as $value)
+        {
+            //echo "$value ";
+            foreach ($arr as $key => $value){
+                echo("$key : $value <br>");
+            }
+        }*/
+    return $holidays;
+}
+function get_holidays_location($all=FALSE)
+{
+  global $tbl_area;
+
+  $areas = array();
+
+  $sql = "SELECT id, area_name FROM $tbl_area";
+  if (empty($all))
+  {
+    $sql .= " WHERE disabled=0";
+  }
+  $sql .= " ORDER BY sort_key";
+
+  $res = db()->query($sql);
+
+  while (false !== ($row = $res->next_row_keyed()))
+  {
+    $areas[$row['id']] = $row['area_name'];
+  }
+
+  return $areas;
 }

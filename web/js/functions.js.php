@@ -13,71 +13,41 @@ if ($use_strict)
 
 ?>
 
-// Fix for iOS 13 where the User Agent string has been changed.
-// See https://github.com/flatpickr/flatpickr/issues/1992
-function isIos()
-{
-  return (window.navigator.userAgent.match(/iPad/i) ||
-          window.navigator.userAgent.match(/iPhone/i) ||
-          /iPad|iPhone|iPod/.test(navigator.platform) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-}
 
 function isMobile()
 {
-  return (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || isIos());
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
 $.fn.reverse = [].reverse;
 
 
 jQuery.fn.extend({
-
+  
   <?php
   // Turn a select element into a fancy Select2 field control.  This wrapper function also
-  // (a) only does anything if we are using tags or are not on a mobile device, because the native select
-  //     elements on mobile devices tend to be better.  [Could maybe turn the element from a <select>
-  //     into a <datalist> if we are using tags?]
+  // (a) only does anything if we are not on a mobile device, because the native select
+  //     elements on mobile devices tend to be better.
   // (b) wraps the select element in a <div> because in some places, eg in forms,  MRBS uses
   //     a table structure and because Select2 adds a sibling element the table structure is
   //     ruined.
   // (c) adjusts the width of the select2 container because Select2 doesn't always get it right
-  //     resulting in a '...'
-  //
-  // Get the best available language
-  $select2_lang = basename(get_select2_lang_path(), '.js');
+  //     resilting in a '...'
   ?>
-  mrbsSelect: function(tags) {
-    if (tags || !isMobile())
+  mrbsSelect: function() {
+    if (!isMobile())
     {
-      tags = Boolean(tags);
       $(this).wrap('<div></div>')
-        .select2({
-          dropdownAutoWidth: true,
-          tags: tags,
-          <?php
-          if (isset($select2_lang) && ($select2_lang !== ''))
-          {
-            echo "language: '$select2_lang',";
-          }
-          ?>
-        })
-        .next('.select2-container').each(function() {
-            var container = $(this);
-            container.width(container.width() + 5);
-          });
+             .select2()
+             .next('.select2-container').each(function() {
+                var container = $(this);
+                container.width(container.width() + 5);
+              });
     }
     return($(this));
   }
-
+  
 });
-
-
-function getMaxWidth (selection) {
-  return Math.max.apply(null, selection.map(function() {
-    return $(this).width();
-  }).get());
-}
 
 
 function getErrorList(errors)
@@ -86,9 +56,9 @@ function getErrorList(errors)
       patternSpan = /<span[\s\S]*span>/gi,
       patternTags = /<\S[^><]*>/g,
       str;
-
+      
   result.html += "<ul>";
-
+  
   for (var i=0; i<errors.length; i++)
   {
     result.html += "<li>" + errors[i] + "<\/li>";
@@ -99,9 +69,9 @@ function getErrorList(errors)
     result.text += $('<div>').html(str).text();
     result.text += "  \n";
   }
-
+  
   result.html += "<\/ul>";
-
+  
   return result;
 }
 
@@ -113,7 +83,7 @@ function getErrorList(errors)
 var visibilityPrefix = function visibilityPrefix() {
     var prefixes = ['', 'webkit', 'moz', 'ms', 'o'];
     var testProperty;
-
+    
     if (typeof visibilityPrefix.prefix === 'undefined')
     {
       visibilityPrefix.prefix = null;
@@ -161,14 +131,14 @@ function throttle(fn, threshold, scope) {
 
   var last,
       deferTimer;
-
+      
   threshold || (threshold = 250);
-
+  
   return function () {
     var context = scope || this,
         now = +new Date(),
         args = arguments;
-
+        
     if (last && now < last + threshold)
     {
       // hold on to it
@@ -178,7 +148,7 @@ function throttle(fn, threshold, scope) {
           fn.apply(context, args);
         }, threshold);
     }
-    else
+    else 
     {
       last = now;
       fn.apply(context, args);
@@ -192,20 +162,20 @@ function throttle(fn, threshold, scope) {
 ?>
 function isMeteredConnection()
 {
-  var connection = navigator.connection ||
-                   navigator.mozConnection ||
+  var connection = navigator.connection || 
+                   navigator.mozConnection || 
                    navigator.webkitConnection ||
                    navigator.msConnection ||
                    null;
-
+  
   if (connection === null)
   {
     return false;
   }
-
+  
   if ('type' in connection)
   {
-    <?php
+    <?php 
     // Although not all cellular networks will be metered, they
     // may be subject to throttling once a data threshold has passed.
     // It is probably sensible to assume that most users connected via
@@ -213,13 +183,13 @@ function isMeteredConnection()
     ?>
     return (connection.type === 'cellular');
   }
-
+  
   <?php // The older version of the interface ?>
   if ('metered' in connection)
   {
     return connection.metered;
   }
-
+  
   return false;
 }
 
@@ -269,10 +239,10 @@ function getParameterByName(name, url)
 
         if (this.length < 1)
             return;
-
+	
 	// Set direction default to 'both'.
 	direction = direction || 'both';
-
+	    
         var $t          = this.length > 1 ? this.eq(0) : this,
 						isContained = typeof container !== 'undefined' && container !== null,
 						$c				  = isContained ? $(container) : $w,

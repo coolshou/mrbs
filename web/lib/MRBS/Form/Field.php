@@ -51,13 +51,11 @@ abstract class Field extends Element
     return $this;
   }
   
-
-  // If $raw is true then the text will not be put through htmlspecialchars().  Only to
-  // be used for trusted text.  
-  public function setLabel($text, $text_at_start=false, $raw=false)
+  
+  public function setLabel($text)
   {
     $label = $this->getElement('label');
-    $label->setText($text, $text_at_start, $raw);
+    $label->setText($text);
     $this->setElement('label', $label);
     return $this;
   }

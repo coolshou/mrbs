@@ -38,8 +38,6 @@ function get_color_key()
 // displayed.
 function make_area_select_html($view, $year, $month, $day, $current)
 {
-  global $multisite, $site;
-
   $out_html = '';
 
   $areas = get_area_names();
@@ -54,15 +52,10 @@ function make_area_select_html($view, $year, $month, $day, $current)
 
     $form->setAttributes(array('class'  => 'areaChangeForm',
                                'method' => 'get',
-                               'action' => multisite(this_page())));
+                               'action' => 'index.php'));
 
     $form->addHiddenInputs(array('view'      => $view,
                                  'page_date' => $page_date));
-
-    if ($multisite && isset($site) && ($site !== ''))
-    {
-      $form->addHiddenInput('site', $site);
-    }
 
     $select = new ElementSelect();
     $select->setAttributes(array('class'      => 'room_area_select',
@@ -87,7 +80,7 @@ function make_area_select_html($view, $year, $month, $day, $current)
 
 function make_room_select_html ($view, $view_all, $year, $month, $day, $area, $current)
 {
-  global $multisite, $site;
+  global $server, $room;
 
   $out_html = '';
 
@@ -118,17 +111,12 @@ function make_room_select_html ($view, $view_all, $year, $month, $day, $area, $c
 
     $form->setAttributes(array('class'  => 'roomChangeForm',
                                'method' => 'get',
-                               'action' => multisite(this_page())));
+                               'action' => 'index.php'));
 
     $form->addHiddenInputs(array('view'      => $view,
                                  'view_all'  => 0,
                                  'page_date' => $page_date,
                                  'area'      => $area));
-
-    if ($multisite && isset($site) && ($site !== ''))
-    {
-      $form->addHiddenInput('site', $site);
-    }
 
     $select = new ElementSelect();
     $select->setAttributes(array('class'      => 'room_area_select',
@@ -248,10 +236,9 @@ function get_view_nav($current_view, $view_all, $year, $month, $day, $area, $roo
                   'room'      => $room);
 
     $query = http_build_query($vars, '', '&');
-    $href = multisite("index.php?$query");
     $html .= '<a';
     $html .= ($view == $current_view) ? ' class="selected"' : '';
-    $html .= ' href="' . htmlspecialchars($href) . '">' . htmlspecialchars(get_vocab($token)) . '</a>';
+    $html .= ' href="index.php?' . htmlspecialchars($query) . '">' . htmlspecialchars(get_vocab($token)) . '</a>';
   }
 
   $html .= '</div>';
@@ -293,10 +280,6 @@ function get_arrow_nav($view, $view_all, $year, $month, $day, $area, $room)
   $link_prev = get_adjacent_link($view, $view_all, $year, $month, $day, $area, $room, false);
   $link_today = get_today_link($view, $view_all, $area, $room);
   $link_next = get_adjacent_link($view, $view_all, $year, $month, $day, $area, $room, true);
-
-  $link_prev = multisite($link_prev);
-  $link_today = multisite($link_today);
-  $link_next = multisite($link_next);
 
   $html .= "<nav class=\"arrow\">\n";
   $html .= "<a class=\"prev\" title=\"$title_prev\" aria-label=\"$title_prev\" href=\"" . htmlspecialchars($link_prev) . "\"></a>";  // Content will be filled in by CSS
@@ -398,6 +381,7 @@ function get_date_heading($view, $year, $month, $day)
 }
 
 
+
 // Get non-standard form variables
 $refresh = get_form_var('refresh', 'int');
 $timetohighlight = get_form_var('timetohighlight', 'int');
@@ -412,12 +396,6 @@ if ($room < 0)
 
 $is_ajax = is_ajax();
 
-// If we're using the 'db' authentication type, check to see if MRBS has just been installed
-// and, if so, redirect to the edit_users page so that they can set up users.
-if (($auth['type'] == 'db') && (count(auth()->getUsers()) == 0))
-{
-  location_header('edit_users.php');
-}
 
 // Check the user is authorised for this page
 if (!checkAuthorised(this_page(), $refresh))
@@ -441,24 +419,25 @@ switch ($view)
     break;
 }
 
+
 if ($refresh)
 {
   echo $inner_html;
   exit;
 }
 
-// print the page header
-$context = array(
-    'view'      => $view,
-    'view_all'  => $view_all,
-    'year'      => $year,
-    'month'     => $month,
-    'day'       => $day,
-    'area'      => $area,
-    'room'      => isset($room) ? $room : null
-  );
 
-print_header($context);
+// If we're using the 'db' authentication type, check to see if MRBS has just been installed
+// and, if so, redirect to the edit_users page so that they can set up users.
+if (($auth['type'] == 'db') && (count(authGetUsers()) == 0))
+{
+  header('Location: edit_users.php');
+  exit;
+}
+
+
+// print the page header
+print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
 
 echo "<div class=\"minicalendars\">\n";
 echo "</div>\n";
@@ -472,7 +451,7 @@ if ($times_along_top)
 {
   $classes[] .= 'times-along-top';
 }
-if ($view_all && ($view !== 'day'))
+if ($view_all)
 {
   $classes[] = 'all_rooms';
 }

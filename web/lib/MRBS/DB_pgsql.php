@@ -16,7 +16,7 @@ class DB_pgsql extends DB
   // resolve a qualified table name into its schema and table components.
   // Returns an an array indexed by 'table_schema' and 'table_name'.
   // 'table_schema' can be NULL
-  private static function resolve_table($table)
+  static private function resolve_table($table)
   {
     if (strpos($table, '.') === false)
     {
@@ -133,7 +133,7 @@ class DB_pgsql extends DB
   {
     // $table can be a qualified name.  We need to resolve it if necessary into its component
     // parts, the schema and table names
-    $table_parts = self::resolve_table($table);
+    $table_parts = $this->resolve_table($table);
 
     $sql_params = array();
     $sql = "SELECT COUNT(*)
@@ -205,7 +205,7 @@ class DB_pgsql extends DB
 
     // $table can be a qualified name.  We need to resolve it if necessary into its component
     // parts, the schema and table names
-    $table_parts = self::resolve_table($table);
+    $table_parts = $this->resolve_table($table);
 
     $sql_params = array();
 

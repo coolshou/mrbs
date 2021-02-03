@@ -58,11 +58,13 @@ function get_field_areamatch($data)
 
 function get_field_roommatch($data)
 {
+  global $tbl_room;
+
   $field = new FieldInputDatalist();
 
   // (We need DISTINCT because it's possible to have two rooms of the same name
   // in different areas)
-  $sql = "SELECT DISTINCT room_name FROM " . _tbl('room');
+  $sql = "SELECT DISTINCT room_name FROM $tbl_room";
 
   // Don't show the invisible rooms
   $invisible_room_ids = get_invisible_room_ids();
@@ -87,11 +89,17 @@ function get_field_roommatch($data)
 
 function get_field_typematch($data)
 {
-  $options = get_type_options(true);
+  global $booking_types;
 
-  if (count($options) < 2)
+  if (!isset($booking_types) || (count($booking_types) < 2))
   {
     return null;
+  }
+
+  $options = array();
+  foreach ($booking_types as $type)
+  {
+    $options[$type] = get_type_vocab($type);
   }
 
   $field = new FieldSelect();
@@ -111,7 +119,7 @@ function get_field_typematch($data)
 
 function get_field_match_private($data)
 {
-  global $mrbs_user, $private_somewhere;
+  global $user_level, $private_somewhere;
 
   // Only show this part of the form if there are areas that allow private bookings
   if (!$private_somewhere)
@@ -122,7 +130,7 @@ function get_field_match_private($data)
   // If they're not logged in then there's no point in showing this part of the form because
   // they'll only be able to see public bookings anyway (and we don't want to alert them to
   // the existence of private bookings)
-  if (!isset($mrbs_user) || ($mrbs_user->level == 0))
+  if (empty($user_level))
   {
     $field = new ElementInputHidden();
     $field->setAttributes(array('name'  => 'match_private',
@@ -192,10 +200,11 @@ function get_field_custom($data, $key)
   $var = "match_$key";
   global $$var;
 
-  global $field_natures, $field_lengths;
+  global $tbl_entry,
+         $field_natures, $field_lengths;
 
   $name = $var;
-  $label = get_loc_field_name(_tbl('entry'), $key);
+  $label = get_loc_field_name($tbl_entry, $key);
 
   // Output a radio group if it's a boolean or integer <= 2 bytes (which we will
   // assume are intended to be booleans)
@@ -562,7 +571,7 @@ function type_wrap($string, $data_type)
 function report_header()
 {
   global $output_format, $is_ajax;
-  global $custom_fields;
+  global $custom_fields, $tbl_entry;
   global $approval_somewhere, $confirmation_somewhere;
   global $field_order_list, $booking_types;
 
@@ -627,7 +636,7 @@ function report_header()
         // the custom fields
         if (array_key_exists($field, $custom_fields))
         {
-          $values[] = get_loc_field_name(_tbl('entry'), $field);
+          $values[] = get_loc_field_name($tbl_entry, $field);
         }
         break;
     }  // switch
@@ -725,7 +734,7 @@ function close_summary()
 
 
 // Output a table row.
-function output_row($values, $output_format, $body_row = TRUE)
+function output_row(&$values, $output_format, $body_row = TRUE)
 {
   global $json_data, $is_ajax, $csv_col_sep, $csv_row_sep;
 
@@ -755,7 +764,7 @@ function output_row($values, $output_format, $body_row = TRUE)
 }
 
 
-function output_head_rows($rows, $format)
+function output_head_rows(&$rows, $format)
 {
   if (count($rows) == 0)
   {
@@ -780,7 +789,7 @@ function output_head_rows($rows, $format)
 }
 
 
-function output_body_rows($rows, $format)
+function output_body_rows(&$rows, $format)
 {
   global $is_ajax;
 
@@ -798,7 +807,7 @@ function output_body_rows($rows, $format)
 }
 
 
-function output_foot_rows($rows, $format)
+function output_foot_rows(&$rows, $format)
 {
   if (count($rows) == 0)
   {
@@ -814,7 +823,7 @@ function output_foot_rows($rows, $format)
 }
 
 
-function report_row(&$rows, $data)
+function report_row(&$rows, &$data)
 {
   global $output_format, $is_ajax, $ajax_capable;
   global $custom_fields, $field_natures, $field_lengths;
@@ -840,9 +849,6 @@ function report_row(&$rows, $data)
     // more meaningful
     switch ($field)
     {
-      case 'create_by':
-        $value  = get_compound_name($value);
-        break;
       case 'end_time':
         // Calculate the duration and then fall through to calculating the end date
         // Need the duration in seconds for sorting.  Have to correct it for DST
@@ -933,10 +939,9 @@ function report_row(&$rows, $data)
       {
         case 'name':
           // Add a link to the entry and also a data-id value for the Bulk Delete JavaScript
-          $href = multisite('view_entry.php?id=' . urlencode($data['id']));
-          $value = '<a href="' . htmlspecialchars($href) . '"' .
-                   ' data-id="' . htmlspecialchars($data['id']) . '"' .
-                   ' title="' . $value . '">' . $value . '</a>';  // $value already escaped
+          $value = "<a href=\"view_entry.php?id=" . $data['id'] . "\"" .
+                   " data-id=\"" . $data['id'] . "\"" .
+                   " title=\"$value\">$value</a>";
           break;
         case 'end_time':
           // Process the duration and then fall through to the end_time
@@ -974,7 +979,7 @@ function report_row(&$rows, $data)
 }
 
 
-function get_sumby_name_from_row($row)
+function get_sumby_name_from_row(&$row)
 {
   global $sumby;
 
@@ -1013,7 +1018,7 @@ function increment_count(&$array, $index1, $index2, $increment)
 // Collect summary statistics on one entry.
 // This also builds hash tables of all unique names and rooms. When sorted,
 // these will become the column and row headers of the summary table.
-function accumulate($row, &$count, &$hours, $report_start, $report_end,
+function accumulate(&$row, &$count, &$hours, $report_start, $report_end,
                     &$room_hash, &$name_hash)
 {
   global $output_format, $periods;
@@ -1082,7 +1087,7 @@ function entries_format($str)
 // Output the summary table (a "cross-tab report"). $count and $hours are
 // 2-dimensional sparse arrays indexed by [area/room][name].
 // $room_hash & $name_hash are arrays with indexes naming unique rooms and names.
-function do_summary($count, $hours, &$room_hash, &$name_hash)
+function do_summary(&$count, &$hours, &$room_hash, &$name_hash)
 {
   global $output_format, $csv_col_sep;
   global $times_somewhere, $periods_somewhere;
@@ -1374,7 +1379,8 @@ else
 
   // Check the user is authorised for this page
   checkAuthorised(this_page());
-  $mrbs_user = session()->getCurrentUser();
+  $user = getUserName();
+  $user_level = authGetUserLevel($user);
 }
 
 // Set up for Ajax.   We need to know whether we're capable of dealing with Ajax
@@ -1390,8 +1396,8 @@ if ($is_ajax)
 $private_somewhere = some_area('private_enabled') || some_area('private_mandatory');
 $approval_somewhere = some_area('approval_enabled');
 $confirmation_somewhere = some_area('confirmation_enabled');
-$times_somewhere = (db()->query1("SELECT COUNT(*) FROM " . _tbl('area') . " WHERE enable_periods=0") > 0);
-$periods_somewhere = (db()->query1("SELECT COUNT(*) FROM " . _tbl('area') . " WHERE enable_periods!=0") > 0);
+$times_somewhere = (db()->query1("SELECT COUNT(*) FROM $tbl_area WHERE enable_periods=0") > 0);
+$periods_somewhere = (db()->query1("SELECT COUNT(*) FROM $tbl_area WHERE enable_periods!=0") > 0);
 
 
 // Build the report search field order
@@ -1420,7 +1426,7 @@ foreach ($report_search_fields as $field)
 }
 
 // Get information about custom fields
-$fields = db()->field_info(_tbl('entry'));
+$fields = db()->field_info($tbl_entry);
 $custom_fields = array();
 $field_natures = array();
 $field_lengths = array();
@@ -1445,18 +1451,15 @@ foreach ($fields as $field)
 foreach ($custom_fields as $key => $value)
 {
   $var = "match_$key";
-  // Get the field as a string to check whether it is empty (ie match anything)
-  $$var = get_form_var($var, 'string');
-  if (($field_natures[$key] == 'integer') &&
-      ($field_lengths[$key] > 2) &&
-      isset($$var))
+  if (($field_natures[$key] == 'integer') && ($field_lengths[$key] > 2))
   {
-    $$var = trim($$var);
-    if ($$var !== '')
-    {
-      $$var = intval($$var);
-    }
+    $var_type = 'int';
   }
+  else
+  {
+    $var_type = 'string';
+  }
+  $$var = get_form_var($var, $var_type);
 }
 
 // Set the field order list
@@ -1490,12 +1493,12 @@ if ($phase == 2)
     // information in order to construct the recurrence rule
     $sql .= ", T.rep_type, T.end_date, T.rep_opt, T.rep_interval, T.month_absolute, T.month_relative";
   }
-  $sql .= " FROM " . _tbl('area') . " A, " . _tbl('room') . " R, " . _tbl('entry') . " E";
+  $sql .= " FROM $tbl_area A, $tbl_room R, $tbl_entry E";
   if ($output_format == OUTPUT_ICAL)
   {
     // We do a LEFT JOIN because we still want the single entries, ie the ones
     // that won't have a match in the repeat table
-    $sql .= " LEFT JOIN " . _tbl('repeat') . " T ON E.repeat_id=T.id";
+    $sql .= " LEFT JOIN $tbl_repeat T ON E.repeat_id=T.id";
   }
   $sql .= " WHERE E.room_id=R.id AND R.area_id=A.id"
         . " AND E.start_time < ? AND E.end_time > ?";
@@ -1580,17 +1583,17 @@ if ($phase == 2)
   // entries will be found, which is at least safe from the privacy viewpoint)
   if (!$cli_mode && !is_book_admin())
   {
-    if (isset($mrbs_user))
+    if (isset($user))
     {
       // if the user is logged in they can see:
       //   - all bookings, if private_override is set to 'public'
       //   - their own bookings, and others' public bookings if private_override is set to 'none'
       //   - just their own bookings, if private_override is set to 'private'
       $sql .= " AND ((A.private_override='public') OR
-                     ((A.private_override='none') AND ((E.status&" . STATUS_PRIVATE . "=0) OR (E.create_by = ?))) OR
-                     ((A.private_override='private') AND (E.create_by = ?)))";
-      $sql_params[] = $mrbs_user->username;
-      $sql_params[] = $mrbs_user->username;
+                     (A.private_override='none' AND ((E.status&" . STATUS_PRIVATE . "=0) OR E.create_by = ?)) OR
+                     (A.private_override='private' AND E.create_by = ?))";
+      $sql_params[] = $user;
+      $sql_params[] = $user;
     }
     else
     {
@@ -1598,7 +1601,7 @@ if ($phase == 2)
       //   - all bookings, if private_override is set to 'public'
       //   - public bookings if private_override is set to 'none'
       $sql .= " AND ((A.private_override='public') OR
-                     ((A.private_override='none') AND (E.status&" . STATUS_PRIVATE . "=0)))";
+                     (A.private_override='none' AND (E.status&" . STATUS_PRIVATE . "=0)))";
     }
   }
 
@@ -1638,17 +1641,7 @@ if ($is_ajax)
 }
 elseif ($output_form)
 {
-  $context = array(
-      'view'      => $view,
-      'view_all'  => $view_all,
-      'year'      => $year,
-      'month'     => $month,
-      'day'       => $day,
-      'area'      => $area,
-      'room'      => isset($room) ? $room : null
-    );
-
-  print_header($context);
+  print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
 }
 else
 {
@@ -1709,7 +1702,7 @@ if ($output_form)
 
   $attributes = array('id'     => 'report_form',
                       'class'  => 'standard',
-                      'action' => multisite(this_page()),
+                      'action' => 'report.php',
                       'method' => 'post');
 
   $form->setAttributes($attributes)

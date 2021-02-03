@@ -38,6 +38,7 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
   global $enable_periods, $confirmation_enabled, $approval_enabled;
   global $is_private_field, $standard_fields;
   global $strftime_format;
+  global $tbl_entry;
   global $select_options, $booking_types;
   global $edit_entry_field_order;
 
@@ -62,7 +63,6 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
 
   foreach ($data as $key => $value)
   {
-    $hide_this_field = $keep_private && isset($is_private_field["entry.$key"]) && $is_private_field["entry.$key"];
     // We could just test each column against $is_private_field["entry.$key"]
     // but restricting the test to the columns below guards against the possibility
     // that somebody has accidentally configured a 'system' field to be private
@@ -70,6 +70,8 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
     {
       case 'name':
       case 'description':
+      case 'create_by':
+      case 'modified_by':
       case 'room_name':
       case 'area_name':
       case 'type':
@@ -80,24 +82,19 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
       case 'repeat_info_time':
       case 'repeat_info_user':
       case 'repeat_info_text':
-        $data[$key] = $hide_this_field ? $private_text : $data[$key];
-        break;
-        
-      case 'create_by':
-      case 'modified_by':
-        $data[$key] = $hide_this_field ? $private_text : get_display_name($data[$key]);
+        $data[$key] = ($keep_private && isset($is_private_field["entry.$key"]) && $is_private_field["entry.$key"]) ? $private_text : $data[$key];
         break;
 
       default:
         if (!in_array($key, $standard_fields['entry']))
         {
-          $data[$key] = $hide_this_field ? $private_text : $data[$key];
+          $data[$key] = ($keep_private && isset($is_private_field["entry.$key"]) && $is_private_field["entry.$key"]) ? $private_text : $data[$key];
         }
         break;
     }
   }
 
-  $fields = db()->field_info(_tbl('entry'));
+  $fields = db()->field_info($tbl_entry);
 
   // Get the order in which to display fields
   $field_order = (isset($edit_entry_field_order)) ? $edit_entry_field_order : array();
@@ -138,9 +135,6 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
       case 'ical_uid':
       case 'ical_sequence':
       case 'ical_recur_id':
-      case 'allow_registration':
-      case 'enable_registrant_limit':
-      case 'registrant_limit':
         break;
 
       case 'description':
@@ -250,7 +244,7 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
           break;
         }
 
-        $label = get_loc_field_name(_tbl('entry'), $key);
+        $label = get_loc_field_name($tbl_entry, $key);
         // Output a yes/no if it's a boolean or integer <= 2 bytes (which we will
         // assume are intended to be booleans)
         if (($field['nature'] == 'boolean') ||
@@ -293,7 +287,8 @@ function create_details_body($data, $as_html=false, $keep_private=false, $room_d
         break;
     }  // switch
   }  // foreach
-  
+
+
   // Repeat type
   $tbody .= create_details_row(get_vocab("rep_type"), get_vocab("rep_type_" . $data['rep_type']), $as_html);
   // Repeat details

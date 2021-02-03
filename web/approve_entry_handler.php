@@ -21,8 +21,7 @@ Form::checkToken();
 
 // Check the user is authorised for this page
 checkAuthorised(this_page());
-$mrbs_user = session()->getCurrentUser();
-$mrbs_username = (isset($mrbs_user)) ? $mrbs_user->username : null;
+$user = getUserName();
 
 // Retrieve the booking details
 $data = get_booking_info($id, $series);
@@ -38,23 +37,23 @@ if (strpos($returl, '?') === FALSE)
   $returl .= "?year=$year&month=$month&day=$day&area=$area&room=$room";
 }
 
-
+                  
 if (isset($action))
-{
+{                     
   if (need_to_send_mail())
-  {
-    $is_new_entry = TRUE;  // Treat it as a new entry unless told otherwise
+  { 
+    $is_new_entry = TRUE;  // Treat it as a new entry unless told otherwise    
   }
-
+  
   // If we have to approve or reject a booking, check that we have rights to do so
   // for this room
-  if ((($action == "approve") || ($action == "reject"))
+  if ((($action == "approve") || ($action == "reject")) 
        && !is_book_admin($room_id))
   {
     showAccessDenied($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
     exit;
   }
-
+  
   switch ($action)
   {
     // ACTION = "APPROVE"
@@ -74,44 +73,46 @@ if (isset($action))
       // Get the new data, which will have the status changed
       $data = get_booking_info($id, $series);
       break;
-
-
-    // ACTION = "MORE_INFO"
+    
+      
+    // ACTION = "MORE_INFO"  
     case 'more_info':
-      // update the last reminded time (the ball is back in the
+      // update the last reminded time (the ball is back in the 
       // originator's court, so the clock gets reset)
       update_last_reminded($id, $series);
-      // update the more info field
-      update_more_info($id, $series, $mrbs_user->username, $note);
+      // update the more info fields
+      update_more_info($id, $series, $user, $note);
       $result = TRUE;  // We'll assume success and end an email anyway
       break;
-
-
+    
+      
     // ACTION = "REMIND"
     case 'remind':
       // update the last reminded time
       update_last_reminded($id, $series);
       $result = TRUE;  // We'll assume success and end an email anyway
       break;
-
+      
     default:
       $result = FALSE;  // should not get here
       break;
-
+      
   }  // switch ($action)
-
-
-
+  
+  
+  
   // Now send an email if required and the operation was successful
   if ($result && need_to_send_mail())
   {
     // Get the area settings for this area (we will need to know if periods are enabled
-    // so that we will know whether to include iCalendar information in the email)
+    // so that we will kniow whether to include iCalendar information in the email)
     get_area_settings($data['area_id']);
     // Send the email
-    notifyAdminOnBooking($data, $mail_previous, $is_new_entry, $series, $start_times, $action, $note);
+    $result = notifyAdminOnBooking($data, $mail_previous, $is_new_entry, $series, $start_times, $action, $note);
   }
 }
 
 // Now it's all done go back to the previous view
-location_header($returl);
+header("Location: $returl");
+exit;
+

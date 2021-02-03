@@ -40,7 +40,6 @@ var refreshPage = function refreshPage() {
     {
       var data = {refresh: 1,
                   view: args.view,
-                  view_all: args.view_all,
                   page_date: args.pageDate,
                   area: args.area,
                   room: args.room};
@@ -61,38 +60,30 @@ var refreshPage = function refreshPage() {
       ?>
       $('table.dwm_main').addClass('refreshable');
 
-      if(args.site)
-      {
-        data.site = args.site;
-      }
-
-      return $.post(
-          'index.php',
-           data,
-           function(result){
-               <?php
-               // (1) Empty the existing table in order to get rid of events
-               // and data and prevent memory leaks, (2) insert the updated
-               // table HTML, (3) clear the existing interval timer and then
-               // (4) trigger a load event so that the resizable bookings are
-               // re-created and a new timer started.
-               ?>
-               if ((result.length > 0) && !isHidden() && !refreshPage.disabled)
-               {
-                 var table = $('table.dwm_main');
-                 if (!table.hasClass('resizing') && table.hasClass('refreshable'))
+      $.post('index.php',
+             data,
+             function(result){
+                 <?php
+                 // (1) Empty the existing table in order to get rid of events
+                 // and data and prevent memory leaks, (2) insert the updated
+                 // table HTML, (3) clear the existing interval timer and then
+                 // (4) trigger a load event so that the resizable bookings are
+                 // re-created and a new timer started.
+                 ?>
+                 if ((result.length > 0) && !isHidden() && !refreshPage.disabled)
                  {
-                   table.empty();
-                   table.html(result);
-                   window.clearInterval(intervalId);
-                   intervalId = undefined;
-                   table.trigger('tableload');
+                   var table = $('table.dwm_main');
+                   if (!table.hasClass('resizing') && table.hasClass('refreshable'))
+                   {
+                     table.empty();
+                     table.html(result);
+                     window.clearInterval(intervalId);
+                     intervalId = undefined;
+                     table.trigger('tableload');
+                   }
                  }
-
-               }
-             },
-           'html'
-        );
+               },
+             'html');
     }  <?php // if (!isHidden() etc.?>
   };
 
@@ -117,19 +108,10 @@ var refreshVisChanged = function refreshVisChanged() {
         window.clearInterval(intervalId);
         intervalId = undefined;
       }
-      <?php
-      // If the page is now visible then refresh the page and, once that has been
-      // done, refresh the prefetched pages.  Don't initiate the prefetch refresh
-      // until after the main refresh is complete because simultaneous Ajax requests
-      // will cause problems if the inactivity timeout has been exceeded and the
-      // user is logged off as a result: the server code will try and log the user
-      // off each time resulting in session_destroy() throwing an error.
-      ?>
       if (!pageHidden)
       {
-        refreshPage().done(function() {
-          prefetch();
-        });
+        prefetch();  <?php // Refresh the prefetched pages ?>
+        refreshPage();
       }
     }
   };
@@ -221,14 +203,12 @@ var Timeline = {
     }
 
     <?php
-    // Finds the indices (two, if successful) of the element that contains time and pushes it on to the result.
+    // Finds the index of the element that contains time and pushes it on to the result.
     // We iterate through the slots in reverse so that we hit the correct time on the transition into DST.  If
     // we were to iterate through the slots in the normal order we would land on the invalid hour, eg 0100-0200
     // which is really 0200-0300 when the clocks go forward.
-    // Note that sometimes only one index will be returned.  This will happen if the time is within the overall
-    // interval but not within any individual element, because time is outside the booking day.
     ?>
-    function getIndices(slots, time) {
+    function getIndex(slots, time) {
       var element;
       for (var i=slots.length - 1; i>=0; i--) {
         element = slots[i];
@@ -236,7 +216,7 @@ var Timeline = {
         {
           if (Array.isArray(element[0]))
           {
-            getIndices(element, time);
+            getIndex(element, time);
           }
           result.push(i);
           break;
@@ -246,10 +226,10 @@ var Timeline = {
 
     var result = [];
 
-    <?php // Only look for an index if we know that the time is possibly within the slots somewhere ?>
+    <?php // Only look for an index if we know that the time is definitely within the slots somewhee ?>
     if ((typeof slots !== 'undefined') && within(slots, time))
     {
-      getIndices(slots, time);
+      getIndex(slots, time);
     }
 
     return result;
@@ -274,12 +254,12 @@ var Timeline = {
     var timelineFull = thead.data('timeline-full');
     var nowSlotIndices, slot, fraction, row, element;
     var slotSize, delay, timeline;
-    var top, left, borderLeftWidth, borderRightWidth, width, height;
+    var top, left, borderLeftWidth, width, height;
     var headers, headersFirstLast, headersNormal, headerFirstSize, headerLastSize;
 
     nowSlotIndices = Timeline.search(slots, now);
 
-    if (nowSlotIndices.length > 1)
+    if (nowSlotIndices.length > 0)
     {
       slot = slots;
       for (var i=nowSlotIndices.length - 1; i>=0; i--)
@@ -369,10 +349,9 @@ var Timeline = {
           headersFirstLast = headers.filter('.first_last');
           headersNormal = headers.not('.first_last');
           borderLeftWidth = parseInt(headersNormal.first().css('border-left-width'), 10);
-          borderRightWidth = parseInt(headersNormal.first().css('border-right-width'), 10);
           headerFirstSize = headersFirstLast.first().outerWidth();
           headerLastSize = (headersFirstLast.length > 1) ? headersFirstLast.last().outerWidth() : 0;
-          width = row.innerWidth() - (headerFirstSize + headerLastSize + borderLeftWidth + borderRightWidth);
+          width = row.innerWidth() - (headerFirstSize + headerLastSize);
           left = row.offset().left - table.parent().offset().left + borderLeftWidth + headerFirstSize;
         }
         else
@@ -413,7 +392,7 @@ var Timeline = {
     }
     if (Timeline.timerRunning === null)
     {
-      <?php // If we haven't got a slot size, because the page doesn't have a timeline, then get one ?>
+      <?php // If we haven't got a slot size, because the poge doesn't have a timeline, then get one ?>
       if (typeof slotSize === 'undefined')
       {
          slotSize = Timeline.getFirstNonZeroSlotSize();

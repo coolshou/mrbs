@@ -97,16 +97,17 @@ if ($info = get_booking_info($id, FALSE, TRUE))
         }
         if (isset($action) && ($action == "reject"))
         {
-          notifyAdminOnDelete($mail_previous, $start_times, $series, $action, $note);
+          $result = notifyAdminOnDelete($mail_previous, $series, $start_times, $action, $note);
         }
         else
         {
-          notifyAdminOnDelete($mail_previous, $start_times, $series);
+          $result = notifyAdminOnDelete($mail_previous, $series, $start_times);
         }
       }
 
     }
-    location_header($returl);
+    header("Location: $returl");
+    exit();
   }
 }
 

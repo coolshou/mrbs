@@ -6,12 +6,11 @@ namespace MRBS;
 // now disabled by default for security reasons and they will have to enable it if they
 // want to continue using it.
 
-global $auth, $admin_handle;
+global $auth, $admin_handle, $tbl_area, $tbl_room;
 
 if (empty($auth['allow_custom_html']))
 {
-  $sql = "SELECT custom_html
-            FROM " . _tbl('area') . " UNION SELECT custom_html FROM " . _tbl('room');
+  $sql = "SELECT custom_html FROM $tbl_area UNION SELECT custom_html FROM $tbl_room";
   $custom_html = $admin_handle->query_array($sql);
   
   foreach ($custom_html as $value)

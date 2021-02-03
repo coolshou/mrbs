@@ -1,10 +1,6 @@
 <?php
 namespace MRBS;
 
-use MRBS\Auth\AuthFactory;
-use MRBS\Session\SessionFactory;
-
-
 if (!isset($auth['session']))
 {
   switch ($auth['type'])
@@ -20,58 +16,16 @@ if (!isset($auth['session']))
   }
 }
 
-
-if (method_exists(session(), 'processForm'))
-{
-  session()->processForm();
-}
-
-
-// Convenience wrapper function to provide access to an Auth object
-function auth()
-{
-  global $auth;
-
-  static $auth_obj = null;
-
-  if (is_null($auth_obj))
-  {
-    $auth_obj = AuthFactory::create($auth['type']);
-  }
-
-  return $auth_obj;
-}
-
-
-// Convenience wrapper function to provide access to a Session object
-function session()
-{
-  global $auth;
-
-  static $session_obj = null;
-
-  if (is_null($session_obj))
-  {
-    $session_obj = SessionFactory::create($auth['session']);
-  }
-
-  return $session_obj;
-}
+// Need to be in this order
+require_once "auth/auth_$auth[type].inc";
+require_once "session/session_$auth[session].inc";
 
 
 // Gets the minimum user level required to access a page
 function get_page_level($page)
 {
   global $auth, $max_level;
-
-  // If you're resetting your password you won't be logged in and $auth['deny_public_access']
-  // should not apply.
-  if (in_array($page, array('reset_password.php', 'reset_password_handler.php')))
-  {
-    return 0;
-  }
-
-  // Otherwise ...
+  
   switch ($page)
   {
     // These pages are open to the public by default as they only contain
@@ -80,14 +34,14 @@ function get_page_level($page)
     case 'index.php':
       $result = 0;
       break;
-
+      
     // These pages reveal usernames, which could be of assistance to someone trying to
     // break into the system, so users are required to be logged in before viewing them.
     case 'search.php':
     case 'view_entry.php':
       $result = 1;
       break;
-
+      
     // These pages are set to have a minimum access level of 1 as ordinary users
     // should be able to access them because they will have read access and in some
     // cases write access for their own entries.   Where necessary further checks are
@@ -97,10 +51,9 @@ function get_page_level($page)
     case 'edit_room.php':               // Ordinary users can view room details
     case 'edit_users.php':              // Ordinary users can edit their own details
     case 'pending.php':                 // Ordinary users can view their own entries
-    case 'registration_handler.php':    // Ordinary users can register for an event
       $result = 1;
       break;
-
+      
     // These pages allow users to create and delete entries
     case 'check_slot.php':              // Ajax page used by edit_entry.php
     case 'del_entry.php':
@@ -108,7 +61,7 @@ function get_page_level($page)
     case 'edit_entry_handler.php':
       $result = ($auth['only_admin_can_book']) ? 2 : 1;
       break;
-
+    
     // These pages only contain admin features
     case 'add.php':                     // Adds a room
     case 'del.php':                     // Deletes a room
@@ -118,36 +71,34 @@ function get_page_level($page)
     case 'edit_room_handler.php':
     case 'import.php':
     case 'report.php':
-    case 'usernames.php':               // Ajax page for getting a list of users
       $result = 2;
       break;
-
+      
     default:
       $result = (isset($max_level)) ? $max_level : 2;
       break;
   }
-
+  
   if ($auth['deny_public_access'])
   {
     $result = max($result, 1);
   }
-
+  
   return $result;
 }
 
 
 /* getAuthorised($level)
- *
+ * 
  * Check to see if the current user has a certain level of rights
- *
- * $level  - The access level required
- * $returl - The URL to return to eventually
- *
+ * 
+ * $level - The access level required
+ * 
  * Returns:
  *   false - The user does not have the required access
  *   true  - The user has the required access
  */
-function getAuthorised($level, $returl)
+function getAuthorised($level)
 {
   // If the minimum level is zero (or not set) then they are
   // authorised, whoever they are
@@ -157,19 +108,14 @@ function getAuthorised($level, $returl)
   }
 
   // Otherwise we need to check who they are
-  $mrbs_user = session()->getCurrentUser();
-
-  if(!isset($mrbs_user))
+  $user = getUserName();
+  if(isset($user) == false)
   {
-    // Ask them to authenticate, if the session scheme supports it
-    if (method_exists(session(), 'authGet'))
-    {
-      session()->authGet(null, $returl);
-    }
+    authGet();
     return false;
   }
 
-  return ($mrbs_user->level >= $level);
+  return authGetUserLevel($user) >= $level;
 }
 
 
@@ -182,28 +128,27 @@ function getAuthorised($level, $returl)
 function checkAuthorised($page, $just_check=false)
 {
   global $view, $view_all, $year, $month, $day, $area, $room;
-  global $returl;
-
+  
   // Get the minimum authorisation level for this page
   $required_level = get_page_level($page);
-
+  
   if ($just_check)
   {
     if ($required_level == 0)
     {
       return true;
     }
-
-    $mrbs_user = session()->getCurrentUser();
-    return (isset($mrbs_user) && ($mrbs_user->level >= $required_level));
+    
+    $user = getUserName();
+    return (isset($user)) ? (authGetUserLevel($user) >= $required_level) : false;
   }
-
+  
   // Check that the user has this level
-  if (getAuthorised($required_level, $returl))
+  if (getAuthorised($required_level))
   {
     return true;
   }
-
+  
   // If we don't know the right date then use today's
   if (!isset($day) or !isset($month) or !isset($year))
   {
@@ -211,19 +156,19 @@ function checkAuthorised($page, $just_check=false)
     $month = date('m');
     $year  = date('Y');
   }
-
+  
   if (empty($area))
   {
     $area = get_default_area();
   }
-
+  
   showAccessDenied($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
   exit();
 }
 
 
 /* getWritable($creator, $room)
- *
+ * 
  * Determines if the current user is able to modify an entry
  *
  * $creator - The creator of the entry
@@ -283,55 +228,39 @@ function getWritable($creator, $rooms=null, $all=true)
   }
 
   // Always allowed to modify your own stuff
-  $mrbs_user = session()->getCurrentUser();
-  if (isset($mrbs_user) && (strcasecmp($creator, $mrbs_user->username) === 0))
+  $user = getUserName();
+  if (strcasecmp($creator, $user) === 0)
   {
     return true;
   }
-
+  
   // Otherwise you have to be a (booking) admin for this room
   if (is_book_admin($rooms))
   {
     return true;
   }
-
+  
   // Unauthorised access
   return false;
 }
 
 /* showAccessDenied()
- *
+ * 
  * Displays an appropriate message when access has been denied
- *
+ * 
  * Returns: Nothing
  */
 function showAccessDenied($view=null, $view_all=null, $year=null, $month=null, $day=null, $area=null, $room=null)
 {
   global $server;
+  
+  print_header($view, $view_all, $year, $month, $day, $area, isset($room) ? $room : null);
 
-  $context = array(
-      'view'      => $view,
-      'view_all'  => $view_all,
-      'year'      => $year,
-      'month'     => $month,
-      'day'       => $day,
-      'area'      => $area,
-      'room'      => isset($room) ? $room : null
-    );
-
-  print_header($context);
-
-  // Wrap the contents in a <div> to help with styling.  Not a very nice solution, but anyway.
-  echo "<div>\n";
   echo "<h1>" . get_vocab("accessdenied") . "</h1>\n";
   echo "<p>" . get_vocab("norights") . "</p>\n";
-  if (isset($server['HTTP_REFERER']))
-  {
-    echo "<p>\n";
-    echo "<a href=\"" . htmlspecialchars($server['HTTP_REFERER']) . "\">\n" . get_vocab("returnprev") . "</a>\n";
-    echo "</p>\n";
-  }
-  echo "</div>\n";
+  echo "<p>\n";
+  echo "<a href=\"" . htmlspecialchars($server['HTTP_REFERER']) . "\">\n" . get_vocab("returnprev") . "</a>\n";
+  echo "</p>\n";
 
   // Print footer and exit
   print_footer(true);
@@ -342,11 +271,11 @@ function showAccessDenied($view=null, $view_all=null, $year=null, $month=null, $
 function is_admin()
 {
   global $max_level;
-
-  $mrbs_user = session()->getCurrentUser();
+  
+  $user = getUserName();
   $required_level = (isset($max_level) ? $max_level : 2);
-
-  return (isset($mrbs_user) && ($mrbs_user->level >= $required_level));
+  
+  return (authGetUserLevel($user) >= $required_level);
 }
 
 
@@ -402,9 +331,9 @@ function is_book_admin($rooms=null, $all=true)
     throw new \Exception('$rooms===null and $all===false not yet supported.');
   }
 
-  $mrbs_user = session()->getCurrentUser();
-
-  return (isset($mrbs_user) && ($mrbs_user->level >= 2));
+  $user = getUserName();
+  
+  return (authGetUserLevel($user) >= 2);
 }
 
 
@@ -412,10 +341,10 @@ function is_book_admin($rooms=null, $all=true)
 function is_user_admin()
 {
   global $min_user_editing_level;
+  
+  $user = getUserName();
 
-  $mrbs_user = session()->getCurrentUser();
-
-  return (isset($mrbs_user) && ($mrbs_user->level >= $min_user_editing_level));
+  return (authGetUserLevel($user) >= $min_user_editing_level);
 }
 
 

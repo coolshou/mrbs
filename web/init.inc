@@ -8,20 +8,6 @@ function init_errors()
 {
   global $debug;
 
-  // If the error log file is a relative path then turn it into an absolute one in
-  // order to avoid problems in shutdown when the working directory can change.
-  // (See the notes in https://www.php.net/manual/en/function.register-shutdown-function.php).
-  // Check for both Windows and Unix style separators because Unix separators can be used
-  // on Windows.
-  $error_log = ini_get('error_log');
-  if (isset($error_log) &&
-      ($error_log !== '') &&
-      (strpos($error_log, '/') === false) &&
-      (strpos($error_log, '\\') === false))
-  {
-    ini_set('error_log', getcwd() . '/' . $error_log);
-  }
-
   // Make sure notice errors are not reported, they can break mrbs code:
   $error_level = E_ALL & ~E_NOTICE & ~E_USER_NOTICE;
 
@@ -170,7 +156,4 @@ init_errors();
 
 // Start up sessions
 init_sessions();
-
-// Flush the mail queue on shutdown
-register_shutdown_function(__NAMESPACE__ . "\\MailQueue::flush");
 

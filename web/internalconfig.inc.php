@@ -341,6 +341,7 @@ define('REP_MONTH_RELATIVE', 1);
  * DIRECTORIES - internal use, do not change
  *************************************************/
 
+define('MRBS_ROOT',     __DIR__);                   // Root of MRBS installation
 define('TZDIR',         'tzurl/zoneinfo');          // Directory containing TZURL definitions
 define('TZDIR_OUTLOOK', 'tzurl/zoneinfo-outlook');  // Outlook compatible TZURL definitions
 
@@ -388,10 +389,7 @@ $standard_fields['entry'] = array('id',
                                   'info_text',
                                   'ical_uid',
                                   'ical_sequence',
-                                  'ical_recur_id',
-                                  'allow_registration',
-                                  'enable_registrant_limit',
-                                  'registrant_limit');
+                                  'ical_recur_id');
 
 $standard_fields['repeat'] = array('id',
                                    'start_time',
@@ -425,7 +423,6 @@ $standard_fields['room'] = array('id',
                                  'description',
                                  'capacity',
                                  'room_admin_email',
-                                 'invalid_types',
                                  'custom_html');
 
 // Boolean fields.    These are fields which are treated as booleans
@@ -443,18 +440,12 @@ $boolean_fields['area'] = array('area_disabled',
                                 'max_per_month_enabled',
                                 'max_per_year_enabled',
                                 'max_per_future_enabled',
-                                'max_secs_per_day_enabled',
-                                'max_secs_per_week_enabled',
-                                'max_secs_per_month_enabled',
-                                'max_secs_per_year_enabled',
-                                'max_secs_per_future_enabled',
                                 'max_duration_enabled',
                                 'approval_enabled',
                                 'reminders_enabled',
                                 'enable_periods',
                                 'confirmation_enabled',
-                                'confirmed_default',
-                                'times_along_top');
+                                'confirmed_default');
 
 // Permitted values for 'private_override'
 $private_override_options = array('none', 'public', 'private');
@@ -466,7 +457,7 @@ $private_override_options = array('none', 'public', 'private');
 // do this because they will get overwritten by the values for
 // the current area in a moment - in standard_vars.inc by a call to
 // get_area_settings().   [This isn't a very elegant way of handling
-// per-area settings and ought to be revisited at some stage]
+// per-area settings and perhaps ought to be revisited at some stage]
 
 $area_defaults_keys = array('timezone',
                             'resolution',
@@ -496,9 +487,7 @@ $area_defaults_keys = array('timezone',
                             'enable_periods',
                             'periods',
                             'confirmation_enabled',
-                            'confirmed_default',
-                            'times_along_top',
-                            'default_area');
+                            'confirmed_default');
 
 $area_defaults = array();
 
@@ -517,17 +506,6 @@ $area_defaults['max_per_year_enabled']     = $max_per_interval_area_enabled['yea
 $area_defaults['max_per_year']             = $max_per_interval_area['year'];
 $area_defaults['max_per_future_enabled']   = $max_per_interval_area_enabled['future'];
 $area_defaults['max_per_future']           = $max_per_interval_area['future'];
-
-$area_defaults['max_secs_per_day_enabled']      = $max_secs_per_interval_area_enabled['day'];
-$area_defaults['max_secs_per_day']              = $max_secs_per_interval_area['day'];
-$area_defaults['max_secs_per_week_enabled']     = $max_secs_per_interval_area_enabled['week'];
-$area_defaults['max_secs_per_week']             = $max_secs_per_interval_area['week'];
-$area_defaults['max_secs_per_month_enabled']    = $max_secs_per_interval_area_enabled['month'];
-$area_defaults['max_secs_per_month']            = $max_secs_per_interval_area['month'];
-$area_defaults['max_secs_per_year_enabled']     = $max_secs_per_interval_area_enabled['year'];
-$area_defaults['max_secs_per_year']             = $max_secs_per_interval_area['year'];
-$area_defaults['max_secs_per_future_enabled']   = $max_secs_per_interval_area_enabled['future'];
-$area_defaults['max_secs_per_future']           = $max_secs_per_interval_area['future'];
 
 
 // We send Ajax requests to ajax/del_entries.php with data as an array of ids.

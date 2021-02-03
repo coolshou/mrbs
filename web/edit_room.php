@@ -64,22 +64,22 @@ require_once "mrbs_sql.inc";
 
 function get_custom_fields($data)
 {
-  global $standard_fields, $text_input_max;
-
+  global $tbl_room, $standard_fields, $text_input_max;
+  
   $result = array();
   $disabled = !is_admin();
-
+  
   // Get the information about the columns in the room table
-  $columns = db()->field_info(_tbl('room'));
-
+  $columns = db()->field_info($tbl_room);
+  
   foreach ($columns as $column)
   {
     if (!in_array($column['name'], $standard_fields['room']))
     {
-      $label = get_loc_field_name(_tbl('room'), $column['name']);
+      $label = get_loc_field_name($tbl_room, $column['name']);
       $name = VAR_PREFIX . $column['name'];
       $value = $data[$column['name']];
-
+      
       // Output a checkbox if it's a boolean or integer <= 2 bytes (which we will
       // assume are intended to be booleans)
       if (($column['nature'] == 'boolean') ||
@@ -114,7 +114,7 @@ function get_custom_fields($data)
       $result[] = $field;
     }
   }
-
+  
   return $result;
 }
 
@@ -124,14 +124,14 @@ function get_fieldset_errors($errors)
   $fieldset = new ElementFieldset();
   $fieldset->addLegend('')
            ->setAttribute('class', 'error');
-
+  
   foreach ($errors as $error)
   {
     $element = new ElementP();
     $element->setText(get_vocab($error));
     $fieldset-> addElement($element);
   }
-
+  
   return $fieldset;
 }
 
@@ -139,9 +139,9 @@ function get_fieldset_errors($errors)
 function get_fieldset_general($data)
 {
   global $auth;
-
+  
   $disabled = !is_admin();
-
+  
   $fieldset = new ElementFieldset();
 
   // The area select
@@ -152,7 +152,7 @@ function get_fieldset_general($data)
                                      'disabled' => $disabled))
         ->addSelectOptions($areas, $data['area_id'], true);
   $fieldset->addElement($field);
-
+  
   // Room name
   $field = new FieldInputText();
   $field->setLabel(get_vocab('name'))
@@ -162,7 +162,7 @@ function get_fieldset_general($data)
                                      'required'  => true,
                                      'disabled'  => $disabled));
   $fieldset->addElement($field);
-
+  
   // Sort key
   if (is_admin())
   {
@@ -175,7 +175,7 @@ function get_fieldset_general($data)
                                        'disabled'  => $disabled));
     $fieldset->addElement($field);
   }
-
+  
   // Status - Enabled or Disabled
   if (is_admin())
   {
@@ -188,7 +188,7 @@ function get_fieldset_general($data)
           ->addRadioOptions($options, 'room_disabled', $value, true, $disabled);
     $fieldset->addElement($field);
   }
-
+  
   // Description
   $field = new FieldInputText();
   $field->setLabel(get_vocab('description'))
@@ -197,7 +197,7 @@ function get_fieldset_general($data)
                                      'maxlength' => maxlength('room.description'),
                                      'disabled'  => $disabled));
   $fieldset->addElement($field);
-
+  
   // Capacity
   $field = new FieldInputNumber();
   $field->setLabel(get_vocab('capacity'))
@@ -206,7 +206,7 @@ function get_fieldset_general($data)
                                      'value'    => $data['capacity'],
                                      'disabled' => $disabled));
   $fieldset->addElement($field);
-
+  
   // Room admin email
   $field = new FieldInputEmail();
   $field->setLabel(get_vocab('room_admin_email'))
@@ -216,19 +216,7 @@ function get_fieldset_general($data)
                                      'multiple'  => true,
                                      'disabled'  => $disabled));
   $fieldset->addElement($field);
-
-  // Invalid types
-  $field = new FieldSelect();
-  $field->setAttribute('class', 'multiline')
-        ->setLabel(get_vocab('invalid_types'))
-        ->setLabelAttribute('title', get_vocab('invalid_types_note'))
-        ->setControlAttributes(array(
-            'name'     => 'invalid_types[]',
-            'multiple' => true)
-          )
-        ->addSelectOptions(get_type_options(true), $data['invalid_types'], true);
-  $fieldset->addElement($field);
-
+  
   // The custom HTML
   if (is_admin() && $auth['allow_custom_html'])
   {
@@ -240,19 +228,18 @@ function get_fieldset_general($data)
           ->setControlText($data['custom_html']);
     $fieldset->addElement($field);
   }
-
+  
   // Then the custom fields
   $fields = get_custom_fields($data);
   $fieldset->addElements($fields);
-
+  
   // The Submit and Back buttons
   $field = new FieldInputSubmit();
-
+  
   $back = new ElementInputSubmit();
   $back->setAttributes(array('value'      => get_vocab('backadmin'),
-                             'formaction' => multisite('admin.php')));
-  $field->setAttribute('class', 'buttons')
-        ->addLabelClass('no_suffix')
+                             'formaction' => 'admin.php'));
+  $field->addLabelClass('no_suffix')
         ->addLabelElement($back)
         ->setControlAttribute('value', get_vocab('change'));
   if (!is_admin())
@@ -260,7 +247,7 @@ function get_fieldset_general($data)
     $field->removeControl();
   }
   $fieldset->addElement($field);
-
+  
   return $fieldset;
 }
 
@@ -268,17 +255,7 @@ function get_fieldset_general($data)
 // Check the user is authorised for this page
 checkAuthorised(this_page());
 
-$context = array(
-    'view'      => $view,
-    'view_all'  => $view_all,
-    'year'      => $year,
-    'month'     => $month,
-    'day'       => $day,
-    'area'      => isset($area) ? $area : null,
-    'room'      => isset($room) ? $room : null
-  );
-
-print_header($context);
+print_header($view, $view_all, $year, $month, $day, isset($area) ? $area : null, isset($room) ? $room : null);
 
 // Get the details for this room
 if (empty($room) || is_null($data = get_room_details($room)))
@@ -293,12 +270,12 @@ $form = new Form();
 
 $attributes = array('id'     => 'edit_room',
                     'class'  => 'standard',
-                    'action' => multisite('edit_room_handler.php'),
+                    'action' => 'edit_room_handler.php',
                     'method' => 'post');
-
+                    
 // Non-admins will only be allowed to view room details, not change them
 $legend = (is_admin()) ? get_vocab('editroom') : get_vocab('viewroom');
-
+                    
 $form->setAttributes($attributes)
      ->addHiddenInput('room', $data['id'])
      ->addHiddenInput('old_area', $data['area_id'])

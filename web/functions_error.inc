@@ -131,7 +131,7 @@ function output_error($heading, $body, $show_data=false)
         // in error logs.
         foreach (array('username', 'password') as $var)
         {
-          if (isset($post_tmp[$var]) && ($post_tmp[$var] !== ''))
+          if (isset($post_tmp[$var]))
           {
             $post_tmp[$var] = '****';
           }
@@ -169,7 +169,7 @@ function error_handler($errno, $errstr, $errfile, $errline)
   // Check to see whether error reporting has been disabled by
   // the error suppression operator (@), because the custom error
   // handler is still called even if errors are suppressed.
-  if (!(error_reporting() & $errno))
+  if (error_reporting() === 0)
   {
     return;
   }

@@ -28,10 +28,10 @@ $admin_table_header_sep_color   = $body_background_color; // vertical separator 
 $admin_table_header_font_color  = $header_font_color;     // font colour for header
 $admin_table_border_color       = "#C3CCD3";
 
-$main_table_border_color        = "#dddddd";    // border colour for day/week/month tables - outside
-$main_table_header_border_color = "#dddddd";    // border colour for day/week/month tables - header
-$main_table_body_h_border_color = "#ffffff";    // border colour for day/week/month tables - body, horizontal
-$main_table_body_v_border_color = "#e4e4e4";    // border colour for day/week/month tables - body, vertical
+$main_table_border_color        = "#dddddd";              // border colour for day/week/month tables - outside
+$main_table_header_border_color = "#dddddd"; // border colour for day/week/month tables - header
+$main_table_body_h_border_color = "#ffffff";              // border colour for day/week/month tables - body, horizontal
+$main_table_body_v_border_color = "#e4e4e4";              // border colour for day/week/month tables - body, vertical
 $main_table_month_color         = "#ffffff";    // background colour for days in the month view
 $main_table_month_invalid_color = "#d1d9de";    // background colour for invalid days in the month view
 $main_table_slot_invalid_color  = "#d1d9de";    // background colour for invalid slots in the day and week views
@@ -76,7 +76,7 @@ $column_hidden_color            = $main_table_month_invalid_color;    // hidden 
 $calendar_hidden_color          = "#dae0e4";                          // hidden days in the mini-cals
 $row_even_color                 = "#ffffff";        // even rows in the day and week views
 $row_odd_color                  = "#efefef";        // even rows in the day and week views
-$row_highlight_color            = $banner_back_color;  // used for highlighting a row
+$row_highlight_color            = "#1976D2";        // used for highlighting a row
 
 $help_highlight_color           = "#ffe6f0";        // highlighting text on the help page
 
@@ -100,7 +100,7 @@ $color_types = array(
 
 // colours used for pending.php and bookings awaiting approval
 $outstanding_color         = "#FFF36C";     // font colour for the outstanding reservations message in the header
-$pending_header_back_color = $header_back_color; // background colour for series headers
+$pending_header_back_color = $header_back_color;; // background colour for series headers
 $series_entry_back_color   = "#FFFCDA";     // background colour for entries in a series
 $pending_control_color     = "#FFF36C";     // background colour for the series +/- controls in pending.php
 $attention_color           = 'darkorange';  // background colour for the number of bookings awaiting approval

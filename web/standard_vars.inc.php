@@ -26,7 +26,7 @@ if (empty($room))
 
 // No point in showing all the rooms if there's only one of them.  Show
 // the normal view (with time slots) instead
-if (($view != 'day') && count(get_rooms($area)) == 1)
+if (($view == 'week') && count(get_rooms($area)) == 1)
 {
   $view_all = false;
 }
@@ -60,19 +60,4 @@ else
       break;
     }
   }
-}
-
-// Advance to the next non-hidden day
-if (!empty($hidden_days) &&     // Use !empty in case $hidden_days is not set
-    (count($hidden_days) < 7))  // Avoid an infinite loop
-{
-  $date = new DateTime();
-  $date->setDate($year, $month, $day);
-  while (in_array($date->format('w'), $hidden_days))
-  {
-    $date->add(new \DateInterval('P1D'));
-  }
-  $day = $date->getDay();
-  $month = $date->getMonth();
-  $year = $date->getYear();
 }

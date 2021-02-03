@@ -4,10 +4,10 @@
  *
  * To rebuild or modify this file with the latest versions of the included
  * software please visit:
- *   https://datatables.net/download/#dt/jszip-2.5.0/pdfmake-0.1.36/dt-1.10.21/b-1.6.3/b-colvis-1.6.3/b-flash-1.6.3/b-html5-1.6.3/b-print-1.6.3/cr-1.5.2/fc-3.3.1
+ *   https://datatables.net/download/#dt/jszip-2.5.0/pdfmake-0.1.36/dt-1.10.20/b-1.6.1/b-colvis-1.6.1/b-flash-1.6.1/b-html5-1.6.1/b-print-1.6.1/cr-1.5.2/fc-3.3.0
  *
  * Included libraries:
- *   JSZip 2.5.0, pdfmake 0.1.36, DataTables 1.10.21, Buttons 1.6.3, Column visibility 1.6.3, Flash export 1.6.3, HTML5 export 1.6.3, Print view 1.6.3, ColReorder 1.5.2, FixedColumns 3.3.1
+ *   JSZip 2.5.0, pdfmake 0.1.36, DataTables 1.10.20, Buttons 1.6.1, Column visibility 1.6.1, Flash export 1.6.1, HTML5 export 1.6.1, Print view 1.6.1, ColReorder 1.5.2, FixedColumns 3.3.0
  */
 
 /*
@@ -55,19 +55,19 @@ table.dataTable thead .sorting_desc_disabled {
   background-position: center right;
 }
 table.dataTable thead .sorting {
-  background-image: url("DataTables-1.10.21/images/sort_both.png");
+  background-image: url("DataTables-1.10.20/images/sort_both.png");
 }
 table.dataTable thead .sorting_asc {
-  background-image: url("DataTables-1.10.21/images/sort_asc.png");
+  background-image: url("DataTables-1.10.20/images/sort_asc.png");
 }
 table.dataTable thead .sorting_desc {
-  background-image: url("DataTables-1.10.21/images/sort_desc.png");
+  background-image: url("DataTables-1.10.20/images/sort_desc.png");
 }
 table.dataTable thead .sorting_asc_disabled {
-  background-image: url("DataTables-1.10.21/images/sort_asc_disabled.png");
+  background-image: url("DataTables-1.10.20/images/sort_asc_disabled.png");
 }
 table.dataTable thead .sorting_desc_disabled {
-  background-image: url("DataTables-1.10.21/images/sort_desc_disabled.png");
+  background-image: url("DataTables-1.10.20/images/sort_desc_disabled.png");
 }
 table.dataTable tbody tr {
   background-color: #ffffff;
@@ -187,7 +187,7 @@ table.dataTable.nowrap th, table.dataTable.nowrap td {
 }
 table.dataTable.compact thead th,
 table.dataTable.compact thead td {
-  padding: 4px 17px;
+  padding: 4px 17px 4px 4px;
 }
 table.dataTable.compact tfoot th,
 table.dataTable.compact tfoot td {
@@ -533,7 +533,7 @@ a.dt-button {
   margin-right: 0.333em;
   margin-bottom: 0.333em;
   padding: 0.5em 1em;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  border: 1px solid #999;
   border-radius: 2px;
   cursor: pointer;
   font-size: 0.88em;
@@ -541,18 +541,18 @@ a.dt-button {
   color: black;
   white-space: nowrap;
   overflow: hidden;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: #e9e9e9;
   /* Fallback */
-  background: -webkit-linear-gradient(top, rgba(230, 230, 230, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -webkit-linear-gradient(top, white 0%, #e9e9e9 100%);
   /* Chrome 10+, Saf5.1+, iOS 5+ */
-  background: -moz-linear-gradient(top, rgba(230, 230, 230, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -moz-linear-gradient(top, white 0%, #e9e9e9 100%);
   /* FF3.6 */
-  background: -ms-linear-gradient(top, rgba(230, 230, 230, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -ms-linear-gradient(top, white 0%, #e9e9e9 100%);
   /* IE10 */
-  background: -o-linear-gradient(top, rgba(230, 230, 230, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -o-linear-gradient(top, white 0%, #e9e9e9 100%);
   /* Opera 11.10+ */
-  background: linear-gradient(to bottom, rgba(230, 230, 230, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='rgba(230, 230, 230, 0.1)', EndColorStr='rgba(0, 0, 0, 0.1)');
+  background-image: linear-gradient(to bottom, white 0%, #e9e9e9 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='white', EndColorStr='#e9e9e9');
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -564,26 +564,39 @@ a.dt-button {
 button.dt-button.disabled,
 div.dt-button.disabled,
 a.dt-button.disabled {
+  color: #999;
+  border: 1px solid #d0d0d0;
   cursor: default;
-  opacity: 0.4;
+  background-color: #f9f9f9;
+  /* Fallback */
+  background-image: -webkit-linear-gradient(top, #ffffff 0%, #f9f9f9 100%);
+  /* Chrome 10+, Saf5.1+, iOS 5+ */
+  background-image: -moz-linear-gradient(top, #ffffff 0%, #f9f9f9 100%);
+  /* FF3.6 */
+  background-image: -ms-linear-gradient(top, #ffffff 0%, #f9f9f9 100%);
+  /* IE10 */
+  background-image: -o-linear-gradient(top, #ffffff 0%, #f9f9f9 100%);
+  /* Opera 11.10+ */
+  background-image: linear-gradient(to bottom, #ffffff 0%, #f9f9f9 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#ffffff', EndColorStr='#f9f9f9');
 }
 button.dt-button:active:not(.disabled), button.dt-button.active:not(.disabled),
 div.dt-button:active:not(.disabled),
 div.dt-button.active:not(.disabled),
 a.dt-button:active:not(.disabled),
 a.dt-button.active:not(.disabled) {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: #e2e2e2;
   /* Fallback */
-  background: -webkit-linear-gradient(top, rgba(179, 179, 179, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -webkit-linear-gradient(top, #f3f3f3 0%, #e2e2e2 100%);
   /* Chrome 10+, Saf5.1+, iOS 5+ */
-  background: -moz-linear-gradient(top, rgba(179, 179, 179, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -moz-linear-gradient(top, #f3f3f3 0%, #e2e2e2 100%);
   /* FF3.6 */
-  background: -ms-linear-gradient(top, rgba(179, 179, 179, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -ms-linear-gradient(top, #f3f3f3 0%, #e2e2e2 100%);
   /* IE10 */
-  background: -o-linear-gradient(top, rgba(179, 179, 179, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -o-linear-gradient(top, #f3f3f3 0%, #e2e2e2 100%);
   /* Opera 11.10+ */
-  background: linear-gradient(to bottom, rgba(179, 179, 179, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='rgba(179, 179, 179, 0.1)', EndColorStr='rgba(0, 0, 0, 0.1)');
+  background-image: linear-gradient(to bottom, #f3f3f3 0%, #e2e2e2 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#f3f3f3', EndColorStr='#e2e2e2');
   box-shadow: inset 1px 1px 3px #999999;
 }
 button.dt-button:active:not(.disabled):hover:not(.disabled), button.dt-button.active:not(.disabled):hover:not(.disabled),
@@ -592,18 +605,18 @@ div.dt-button.active:not(.disabled):hover:not(.disabled),
 a.dt-button:active:not(.disabled):hover:not(.disabled),
 a.dt-button.active:not(.disabled):hover:not(.disabled) {
   box-shadow: inset 1px 1px 3px #999999;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: #cccccc;
   /* Fallback */
-  background: -webkit-linear-gradient(top, rgba(128, 128, 128, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -webkit-linear-gradient(top, #eaeaea 0%, #cccccc 100%);
   /* Chrome 10+, Saf5.1+, iOS 5+ */
-  background: -moz-linear-gradient(top, rgba(128, 128, 128, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -moz-linear-gradient(top, #eaeaea 0%, #cccccc 100%);
   /* FF3.6 */
-  background: -ms-linear-gradient(top, rgba(128, 128, 128, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -ms-linear-gradient(top, #eaeaea 0%, #cccccc 100%);
   /* IE10 */
-  background: -o-linear-gradient(top, rgba(128, 128, 128, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -o-linear-gradient(top, #eaeaea 0%, #cccccc 100%);
   /* Opera 11.10+ */
-  background: linear-gradient(to bottom, rgba(128, 128, 128, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='rgba(128, 128, 128, 0.1)', EndColorStr='rgba(0, 0, 0, 0.1)');
+  background-image: linear-gradient(to bottom, #eaeaea 0%, #cccccc 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#eaeaea', EndColorStr='#cccccc');
 }
 button.dt-button:hover,
 div.dt-button:hover,
@@ -614,18 +627,18 @@ button.dt-button:hover:not(.disabled),
 div.dt-button:hover:not(.disabled),
 a.dt-button:hover:not(.disabled) {
   border: 1px solid #666;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: #e0e0e0;
   /* Fallback */
-  background: -webkit-linear-gradient(top, rgba(153, 153, 153, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -webkit-linear-gradient(top, #f9f9f9 0%, #e0e0e0 100%);
   /* Chrome 10+, Saf5.1+, iOS 5+ */
-  background: -moz-linear-gradient(top, rgba(153, 153, 153, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -moz-linear-gradient(top, #f9f9f9 0%, #e0e0e0 100%);
   /* FF3.6 */
-  background: -ms-linear-gradient(top, rgba(153, 153, 153, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -ms-linear-gradient(top, #f9f9f9 0%, #e0e0e0 100%);
   /* IE10 */
-  background: -o-linear-gradient(top, rgba(153, 153, 153, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-image: -o-linear-gradient(top, #f9f9f9 0%, #e0e0e0 100%);
   /* Opera 11.10+ */
-  background: linear-gradient(to bottom, rgba(153, 153, 153, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='rgba(153, 153, 153, 0.1)', EndColorStr='rgba(0, 0, 0, 0.1)');
+  background-image: linear-gradient(to bottom, #f9f9f9 0%, #e0e0e0 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#f9f9f9', EndColorStr='#e0e0e0');
 }
 button.dt-button:focus:not(.disabled),
 div.dt-button:focus:not(.disabled),
@@ -635,16 +648,16 @@ a.dt-button:focus:not(.disabled) {
   outline: none;
   background-color: #79ace9;
   /* Fallback */
-  background: -webkit-linear-gradient(top, #d1e2f7 0%, #79ace9 100%);
+  background-image: -webkit-linear-gradient(top, #bddef4 0%, #79ace9 100%);
   /* Chrome 10+, Saf5.1+, iOS 5+ */
-  background: -moz-linear-gradient(top, #d1e2f7 0%, #79ace9 100%);
+  background-image: -moz-linear-gradient(top, #bddef4 0%, #79ace9 100%);
   /* FF3.6 */
-  background: -ms-linear-gradient(top, #d1e2f7 0%, #79ace9 100%);
+  background-image: -ms-linear-gradient(top, #bddef4 0%, #79ace9 100%);
   /* IE10 */
-  background: -o-linear-gradient(top, #d1e2f7 0%, #79ace9 100%);
+  background-image: -o-linear-gradient(top, #bddef4 0%, #79ace9 100%);
   /* Opera 11.10+ */
-  background: linear-gradient(to bottom, #d1e2f7 0%, #79ace9 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#d1e2f7', EndColorStr='#79ace9');
+  background-image: linear-gradient(to bottom, #bddef4 0%, #79ace9 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#bddef4', EndColorStr='#79ace9');
 }
 
 .dt-button embed {
@@ -657,13 +670,6 @@ div.dt-buttons {
 }
 div.dt-buttons.buttons-right {
   float: right;
-}
-
-div.dataTables_layout_cell div.dt-buttons {
-  float: none;
-}
-div.dataTables_layout_cell div.dt-buttons.buttons-right {
-  float: none;
 }
 
 div.dt-button-collection {
@@ -701,15 +707,15 @@ div.dt-button-collection a.dt-button:active:not(.disabled),
 div.dt-button-collection a.dt-button.active:not(.disabled) {
   background-color: #dadada;
   /* Fallback */
-  background: -webkit-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
+  background-image: -webkit-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
   /* Chrome 10+, Saf5.1+, iOS 5+ */
-  background: -moz-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
+  background-image: -moz-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
   /* FF3.6 */
-  background: -ms-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
+  background-image: -ms-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
   /* IE10 */
-  background: -o-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
+  background-image: -o-linear-gradient(top, #f0f0f0 0%, #dadada 100%);
   /* Opera 11.10+ */
-  background: linear-gradient(to bottom, #f0f0f0 0%, #dadada 100%);
+  background-image: linear-gradient(to bottom, #f0f0f0 0%, #dadada 100%);
   filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#f0f0f0', EndColorStr='#dadada');
   box-shadow: inset 1px 1px 3px #666;
 }
@@ -866,10 +872,6 @@ div.DTFC_RightWrapper table.dataTable {
 div.DTFC_LeftWrapper table.dataTable.no-footer,
 div.DTFC_RightWrapper table.dataTable.no-footer {
   border-bottom: none;
-}
-
-table.dataTable.display tbody tr.DTFC_NoData {
-  background-color: transparent;
 }
 
 

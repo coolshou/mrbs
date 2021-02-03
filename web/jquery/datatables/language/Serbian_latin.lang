@@ -21,7 +21,7 @@
 		"sFirst":    "Početna",
 		"sLast":     "Poslednja",
 		"sNext":     "Sledeća",
-		"sPrevious": "Prethodna"
+		"sPrevious": "Predhodna"
 	},
 	"oAria": {
 		"sSortAscending":  ": aktivirajte da sortirate kolonu uzlazno",
