@@ -20,17 +20,17 @@ function generate_room_delete_form($room, $area)
 {
   $form = new Form();
 
-  $attributes = array('action' => 'del.php',
+  $attributes = array('action' => multisite('del.php'),
                       'method' => 'post');
-                      
+
   $form->setAttributes($attributes);
-  
+
   // Hidden inputs
   $hidden_inputs = array('type' => 'room',
                          'area' => $area,
                          'room' => $room);
   $form->addHiddenInputs($hidden_inputs);
-  
+
   // The button
   $element = new ElementInputImage();
   $element->setAttributes(array('class'  => 'button',
@@ -48,15 +48,15 @@ function generate_room_delete_form($room, $area)
 function generate_area_change_form($enabled_areas, $disabled_areas)
 {
   global $area, $day, $month, $year;
-  
+
   $form = new Form();
-  
+
   $attributes = array('class'  => 'areaChangeForm',
-                      'action' => this_page(),
+                      'action' => multisite(this_page()),
                       'method' => 'post');
-                      
+
   $form->setAttributes($attributes);
-  
+
   // Hidden inputs for page day, month, year
   $hidden_inputs = array('day'   => $day,
                          'month' => $month,
@@ -66,7 +66,7 @@ function generate_area_change_form($enabled_areas, $disabled_areas)
   // Now the visible fields
   $fieldset = new ElementFieldset();
   $fieldset->addLegend('');
-  
+
   // The area select
   if (is_admin())
   {
@@ -77,7 +77,7 @@ function generate_area_change_form($enabled_areas, $disabled_areas)
   {
     $options = $enabled_areas;
   }
-  
+
   $field = new FieldSelect();
   $field->setLabel(get_vocab('area'))
         ->setControlAttributes(array('id'       => 'area_select',
@@ -93,7 +93,7 @@ function generate_area_change_form($enabled_areas, $disabled_areas)
         ->setControlAttributes(array('value' => get_vocab('change'),
                                      'name'  => 'change'));
   $fieldset->addElement($field);
-  
+
   // If they're an admin then give them edit and delete buttons for the area
   if (is_admin())
   {
@@ -103,21 +103,21 @@ function generate_area_change_form($enabled_areas, $disabled_areas)
     $button = new ElementButton();
     $button->setAttributes(array('class'      => 'image',
                                  'title' => get_vocab('edit'),
-                                 'formaction' => 'edit_area.php'))
+                                 'formaction' => multisite('edit_area.php')))
            ->addElement($img);
     $fieldset->addElement($button);
-    
+
     $img = new ElementImg();
     $img->setAttributes(array('src'   => 'images/delete.png',
                               'alt'   => get_vocab('delete')));
     $button = new ElementButton();
     $button->setAttributes(array('class'      => 'image',
                                  'title' => get_vocab('delete'),
-                                 'formaction' => 'del.php?type=area'))
+                                 'formaction' => multisite('del.php?type=area')))
            ->addElement($img);
     $fieldset->addElement($button);
   }
-  
+
   $form->addElement($fieldset);
 
   $form->render();
@@ -127,38 +127,38 @@ function generate_area_change_form($enabled_areas, $disabled_areas)
 function generate_new_area_form()
 {
   $form = new Form();
-  
+
   $attributes = array('id'     => 'add_area',
                       'class'  => 'form_admin standard',
-                      'action' => 'add.php',
+                      'action' => multisite('add.php'),
                       'method' => 'post');
-                      
+
   $form->setAttributes($attributes);
-  
+
   // Hidden field for the type of operation
   $form->addHiddenInput('type', 'area');
-  
+
   // Now the visible fields
   $fieldset = new ElementFieldset();
   $fieldset->addLegend(get_vocab('addarea'));
-  
+
   // The name field
   $field = new FieldInputText();
   $field->setLabel(get_vocab('name'))
         ->setControlAttributes(array('id'        => 'area_name',
                                      'name'      => 'name',
                                      'required'  => true,
-                                     'maxlength' => maxlength('area.area_name')));               
+                                     'maxlength' => maxlength('area.area_name')));
   $fieldset->addElement($field);
-  
+
   // The submit button
   $field = new FieldInputSubmit();
   $field->setControlAttributes(array('value' => get_vocab('addarea'),
                                      'class' => 'submit'));
   $fieldset->addElement($field);
-  
+
   $form->addElement($fieldset);
-  
+
   $form->render();
 }
 
@@ -166,66 +166,66 @@ function generate_new_area_form()
 function generate_new_room_form()
 {
   global $area;
-  
+
   $form = new Form();
-  
+
   $attributes = array('id'     => 'add_room',
                       'class'  => 'form_admin standard',
-                      'action' => 'add.php',
+                      'action' => multisite('add.php'),
                       'method' => 'post');
-                      
+
   $form->setAttributes($attributes);
 
   // Hidden inputs
   $hidden_inputs = array('type' => 'room',
                          'area' => $area);
   $form->addHiddenInputs($hidden_inputs);
-  
+
   // Visible fields
   $fieldset = new ElementFieldset();
   $fieldset->addLegend(get_vocab('addroom'));
-  
+
   // The name field
   $field = new FieldInputText();
   $field->setLabel(get_vocab('name'))
         ->setControlAttributes(array('id'        => 'room_name',
                                      'name'      => 'name',
                                      'required'  => true,
-                                     'maxlength' => maxlength('room.room_name')));               
+                                     'maxlength' => maxlength('room.room_name')));
   $fieldset->addElement($field);
-  
+
   // The description field
   $field = new FieldInputText();
   $field->setLabel(get_vocab('description'))
         ->setControlAttributes(array('id'        => 'room_description',
                                      'name'      => 'description',
-                                     'maxlength' => maxlength('room.description')));               
+                                     'maxlength' => maxlength('room.description')));
   $fieldset->addElement($field);
-   
+
   // Capacity
   $field = new FieldInputNumber();
   $field->setLabel(get_vocab('capacity'))
         ->setControlAttributes(array('name' => 'capacity',
                                      'min'  => '0'));
   $fieldset->addElement($field);
-        
+
   // The email field
   $field = new FieldInputEmail();
   $field->setLabel(get_vocab('room_admin_email'))
         ->setLabelAttribute('title', get_vocab('email_list_note'))
         ->setControlAttributes(array('id'       => 'room_admin_email',
                                      'name'     => 'room_admin_email',
-                                     'multiple' => true));           
+                                     'multiple' => true));
   $fieldset->addElement($field);
-  
+
   // The submit button
   $field = new FieldInputSubmit();
   $field->setControlAttributes(array('value' => get_vocab('addroom'),
                                      'class' => 'submit'));
   $fieldset->addElement($field);
-      
+
   $form->addElement($fieldset);
-  
+
   $form->render();
 }
 
@@ -243,12 +243,28 @@ checkAuthorised(this_page());
 // Get non-standard form variables
 $error = get_form_var('error', 'string');
 
-print_header($view, $view_all, $year, $month, $day, isset($area) ? $area : null, isset($room) ? $room : null);
+
+$context = array(
+    'view'      => $view,
+    'view_all'  => $view_all,
+    'year'      => $year,
+    'month'     => $month,
+    'day'       => $day,
+    'area'      => isset($area) ? $area : null,
+    'room'      => isset($room) ? $room : null
+  );
+
+print_header($context);
 
 // Get the details we need for this area
 if (isset($area))
 {
-  $res = db()->query("SELECT area_name, custom_html FROM $tbl_area WHERE id=? LIMIT 1", array($area));
+  $sql = "SELECT area_name, custom_html
+            FROM " . _tbl('area') . "
+           WHERE id=?
+           LIMIT 1";
+
+  $res = db()->query($sql, array($area));
 
   if ($res->count() == 1)
   {
@@ -269,7 +285,7 @@ if (!empty($error))
 echo "<div id=\"area_form\">\n";
 
 $sql = "SELECT id, area_name, disabled
-          FROM $tbl_area
+          FROM " . _tbl('area') . "
       ORDER BY disabled, sort_key";
 $res = db()->query($sql);
 
@@ -333,8 +349,8 @@ if (is_admin() || !empty($enabled_areas))
   echo "<h2>\n";
   echo get_vocab("rooms");
   if(isset($area_name))
-  { 
-    echo " " . get_vocab("in") . " " . htmlspecialchars($area_name); 
+  {
+    echo " " . get_vocab("in") . " " . htmlspecialchars($area_name);
   }
   echo "</h2>\n";
 
@@ -350,8 +366,8 @@ if (is_admin() || !empty($enabled_areas))
     else
     {
        // Get the information about the fields in the room table
-      $fields = db()->field_info($tbl_room);
-    
+      $fields = db()->field_info(_tbl('room'));
+
       // See if there are going to be any rooms to display (in other words rooms if
       // you are not an admin whether any rooms are enabled)
       $n_displayable_rooms = 0;
@@ -375,7 +391,7 @@ if (is_admin() || !empty($enabled_areas))
         // the table (eg if you are running PostgreSQL and have upgraded your
         // database)
         echo "<table id=\"rooms_table\" class=\"admin_table display\">\n";
-        
+
         // The header
         echo "<thead>\n";
         echo "<tr>\n";
@@ -399,11 +415,12 @@ if (is_admin() || !empty($enabled_areas))
               case 'description':
               case 'capacity':
               case 'room_admin_email':
+              case 'invalid_types':
                 $text = get_vocab($field['name']);
                 break;
               // any user defined fields
               default:
-                $text = get_loc_field_name($tbl_room, $field['name']);
+                $text = get_loc_field_name(_tbl('room'), $field['name']);
                 break;
             }
             // We don't use htmlspecialchars() here because the column names are
@@ -411,15 +428,15 @@ if (is_admin() || !empty($enabled_areas))
             echo "<th>$text</th>\n";
           }
         }
-        
+
         if (is_admin())
         {
           echo "<th>&nbsp;</th>\n";
         }
-        
+
         echo "</tr>\n";
         echo "</thead>\n";
-        
+
         // The body
         echo "<tbody>\n";
         $row_class = "odd";
@@ -432,11 +449,12 @@ if (is_admin() || !empty($enabled_areas))
             echo "<tr class=\"$row_class\">\n";
 
             $html_name = htmlspecialchars($r['room_name']);
+            $href = multisite('edit_room.php?room=' . $r['id']);
             // We insert an invisible span containing the sort key so that the rooms will
             // be sorted properly
             echo "<td><div>" .
                  "<span>" . htmlspecialchars($r['sort_key']) . "</span>" .
-                 "<a title=\"$html_name\" href=\"edit_room.php?room=" . $r['id'] . "\">$html_name</a>" .
+                 "<a title=\"$html_name\" href=\"" . htmlspecialchars($href) . "\">$html_name</a>" .
                  "</div></td>\n";
             if (is_admin())
             {
@@ -457,9 +475,12 @@ if (is_admin() || !empty($enabled_areas))
                   case 'capacity':
                     echo "<td class=\"int\"><div>" . $r[$field['name']] . "</div></td>\n";
                     break;
+                  case 'invalid_types':
+                    echo "<td><div>" . get_type_names($r[$field['name']]) . "</div></td>\n";
+                    break;
                   // any user defined fields
                   default:
-                    if (($field['nature'] == 'boolean') || 
+                    if (($field['nature'] == 'boolean') ||
                         (($field['nature'] == 'integer') && isset($field['length']) && ($field['length'] <= 2)) )
                     {
                       // booleans: represent by a checkmark
@@ -487,7 +508,7 @@ if (is_admin() || !empty($enabled_areas))
                 }  // switch
               }  // if
             }  // foreach
-            
+
             // Give admins a delete button
             if (is_admin())
             {
@@ -497,7 +518,7 @@ if (is_admin() || !empty($enabled_areas))
 
               echo "</div>\n</td>\n";
             }
-            
+
             echo "</tr>\n";
           }
         }
@@ -505,7 +526,7 @@ if (is_admin() || !empty($enabled_areas))
         echo "</tbody>\n";
         echo "</table>\n";
         echo "</div>\n";
-        
+
       }
     }
   }
@@ -514,7 +535,7 @@ if (is_admin() || !empty($enabled_areas))
     echo get_vocab("noarea");
   }
 
-  // Give admins a form for adding rooms to the area - provided 
+  // Give admins a form for adding rooms to the area - provided
   // there's an area selected
   if (is_admin() && $areas_defined && !empty($area))
   {

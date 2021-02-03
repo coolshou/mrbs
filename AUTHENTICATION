@@ -55,7 +55,7 @@ module. There are two general categories:
     special "ext" PHP authentication module.
 
 Internal PHP modules support the following kinds of authentication servers:
-LDAP servers; POP3 email servers; IMAP email servers; NIS servers ; NW servers.
+LDAP servers; POP3 email servers; IMAP email servers; NW servers.
 In addition, three special internal modules support a local list of users for
 one; a local list of users stored in the database for the second; and
 authenticating anybody for the other.
@@ -151,10 +151,8 @@ PHP authentication modules
 |         |                        |                   |  same mail server.     |
 |         |                        |                   |                        |
 +---------+------------------------+-------------------+------------------------+
-|nis      |Users validated by NIS  |                   |  - This extension is   |
-|         |server (user contrib.)  |                   |  not available on      |
-|         |                        |  - ?              |  Windows platforms.    |
-|         |                        |                   |                        |
+|imap_php |A more up to date       |                   |                        |
+|         |version of imap         |                   |                        |
 +---------+------------------------+-------------------+------------------------+
 |nw       |Users validated by      |                   |  - TThis is only going |
 |         |Netware server          |                   |   to work on Linux.    |
@@ -189,6 +187,12 @@ PHP authentication modules
 |         |installation running on |  - Single signoff |  - SAML knowledge      |
 |         |the same server         |  - Hooks into     |    recommended         |
 |         |                        |    SAML infra     |                        |
++---------+------------------------+-------------------+------------------------+
+|idcheck  |For use with mod_idcheck|                   |                        |
+|         |idcheck.sourceforge.net |                   |                        |
+|         |Must be used together   |                   |                        |
+|         |with the 'remote_user'  |                   |                        |
+|         |session scheme.         |                   |                        |
 +---------+------------------------+-------------------+------------------------+
 
 External authentication programs
@@ -710,16 +714,6 @@ $ldap_user_attrib[] = "cn";
 
 Note: if you use the latter configuration then an equal number of base dn's
 and user attributes must be specified or authentication will fail.
-
-
-NIS Authentication
-------------------
-
-$auth["type"] = "nis";
-
-Authenticates the user from the NIS passwd.byname map. Requires the crypt
-password to be stored in the passwd.byname map and won't therefore work
-with shadow password NIS.
 
 
 NT Authentication

@@ -53,7 +53,6 @@ function get_compression_wrappers()
 function get_room_id($location, &$error)
 {
   global $area_room_order, $area_room_delimiter, $area_room_create;
-  global $tbl_room, $tbl_area;
 
   // If there's no delimiter we assume we've just been given a room name (that will
   // have to be unique).   Otherwise we split the location into its area and room parts
@@ -81,7 +80,9 @@ function get_room_id($location, &$error)
   // know which area to put it in.
   if ($location_area == '')
   {
-    $sql = "SELECT COUNT(*) FROM $tbl_room WHERE room_name=?";
+    $sql = "SELECT COUNT(*)
+              FROM " . _tbl('room') . "
+             WHERE room_name=?";
     $count = db()->query1($sql, array($location_room));
 
     if ($count == 0)
@@ -96,7 +97,10 @@ function get_room_id($location, &$error)
     }
     else // we've got a unique room name
     {
-      $sql = "SELECT id FROM $tbl_room WHERE room_name=? LIMIT 1";
+      $sql = "SELECT id
+                FROM " . _tbl('room') . "
+               WHERE room_name=?
+               LIMIT 1";
       $id = db()->query1($sql, array($location_room));
       return $id;
     }
@@ -107,7 +111,7 @@ function get_room_id($location, &$error)
   {
     // First of all get the area id
     $sql = "SELECT id
-              FROM $tbl_area
+              FROM " . _tbl('area') . "
              WHERE area_name=?
              LIMIT 1";
     $area_id = db()->query1($sql, array($location_area));
@@ -134,7 +138,7 @@ function get_room_id($location, &$error)
   }
   // Now we've got the area_id get the room_id
   $sql = "SELECT id
-            FROM $tbl_room
+            FROM " . _tbl('room') . "
            WHERE room_name=?
              AND area_id=?
            LIMIT 1";
@@ -279,7 +283,7 @@ function process_event($vevent)
       while (!(($property['name'] == 'END') && ($property['value'] == $component)) &&
              ($line = next($vevent)))
       {
-        $property = parse_ical_property($line);;
+        $property = parse_ical_property($line);
       }
     }
     $line = next($vevent);
@@ -386,7 +390,9 @@ function process_event($vevent)
   // under the name of the current user
   if (!isset($booking['create_by']))
   {
-    $booking['create_by'] = getUserName();
+    $mrbs_user = session()->getCurrentUser();
+    $mrbs_username = (isset($mrbs_user)) ? $mrbs_user->username : null;
+    $booking['create_by'] = $mrbs_username;
   }
 
   // A SUMMARY is optional in RFC 5545, however a brief description is mandatory
@@ -552,7 +558,7 @@ function get_file_details_zip($file)
       //
       // It's safe to use ReflectionClass (PHP 5) as we already know that
       // ZipArchive (PHP 5.2.0) exists
-      $reflection = new ReflectionClass('ZipArchive');
+      $reflection = new \ReflectionClass('ZipArchive');
       $constants = $reflection->getConstants();
       foreach ($constants as $key => $value)
       {
@@ -762,7 +768,17 @@ if (!empty($import))
 // Check the user is authorised for this page
 checkAuthorised(this_page());
 
-print_header($view, $view_all, $year, $month, $day, $area, $room);
+$context = array(
+  'view'      => $view,
+  'view_all'  => $view_all,
+  'year'      => $year,
+  'month'     => $month,
+  'day'       => $day,
+  'area'      => $area,
+  'room'      => isset($room) ? $room : null
+);
+
+print_header($context);
 
 
 // PHASE 2 - Process the files
@@ -867,7 +883,7 @@ $form = new Form();
 $form->setAttributes(array('class'   => 'standard',
                            'method'  => 'post',
                            'enctype' => 'multipart/form-data',
-                           'action'  => this_page()));
+                           'action'  => multisite(this_page())));
 
 $fieldset = new ElementFieldset();
 

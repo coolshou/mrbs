@@ -19,20 +19,20 @@ namespace MRBS;
  * on existing areas
  **************************************************************************/
 
- 
+
 
 /*******************
  * Calendar settings
  *******************/
 
 // This setting controls whether to use "clock" or "times" based intervals
-// (FALSE and the default) or user defined periods (TRUE).   
+// (FALSE and the default) or user defined periods (TRUE).
 
 // $enable_periods is settable on a per-area basis.
 
 $enable_periods = FALSE;  // Default value for new areas
 
- 
+
 // TIMES SETTINGS
 // --------------
 
@@ -83,7 +83,7 @@ $eveningends           = 18;  // must be integer in range 0-23
 $eveningends_minutes   = 30;   // must be integer in range 0-59
 
 // Example 1.
-// If resolution=3600 (1 hour), morningstarts = 8 and morningstarts_minutes = 30 
+// If resolution=3600 (1 hour), morningstarts = 8 and morningstarts_minutes = 30
 // then for the last period to start at say 4:30pm you would need to set eveningends = 16
 // and eveningends_minutes = 30
 
@@ -173,7 +173,7 @@ $max_delete_ahead_secs = 60*60*24*7;  // (seconds) no more than one week ahead
 // NOTE:  If you are using periods, MRBS has no notion of when the periods occur during the
 // day, and so cannot impose policies of the kind "users must book at least one period
 // in advance".    However it can impose policies such as "users must book at least
-// one day in advance".   The two values above are rounded down to the nearest whole 
+// one day in advance".   The two values above are rounded down to the nearest whole
 // number of days when using periods.   For example 86401 will be rounded down to 86400
 // (one day) and 1 will be rounded down to 0.
 //
@@ -211,10 +211,44 @@ $max_per_interval_area['year'] = 50;    // max 50 bookings per year in an area
 $max_per_interval_area_enabled['future'] = FALSE;
 $max_per_interval_area['future'] = 100; // max 100 bookings in the future in an area
 
+// Set the maximum total *length* of bookings that can be made by any one user, in an interval,
+// which can be a day, week, month or year, or else in the future.  (A week is defined
+// by the $weekstarts setting).   These are per-area settings but you can use them
+// in conjunction with the global settings.   This would allow you to set policies such as
+// allowing a maximum of 10 hours per week in total with a maximum of 1 hour per day in Area A.
+// These settings only apply to areas in "times" mode.
+
+$max_secs_per_interval_area_enabled['day']    = false;
+$max_secs_per_interval_area['day'] = 60*60*2;      // max 2 hours per day in total
+
+$max_secs_per_interval_area_enabled['week']   = false;
+$max_secs_per_interval_area['week'] = 60*60*10;    // max 10 hours per week in total
+
+$max_secs_per_interval_area_enabled['month']  = false;
+$max_secs_per_interval_area['month'] = 60*60*25;   // max 25 hours per month in total
+
+$max_secs_per_interval_area_enabled['year']   = false;
+$max_secs_per_interval_area['year'] = 60*60*100;   // max 100 hours per year in total
+
+$max_secs_per_interval_area_enabled['future'] = false;
+$max_secs_per_interval_area['future'] = 60*60*100; // max 100 hours in the future in total
+
+
+/******************
+ * Display settings
+ ******************/
+
+// In the day view, to display times on the x-axis (along the top) and rooms on the y-axis (down
+// the side set to true; the default/traditional version of MRBS has rooms along the top and
+// times down the side.    Transposing the table can be useful if you have a large number of
+// rooms and not many time slots.
+$times_along_top = false;
+
+
 /************************
  * Miscellaneous settings
  ************************/
- 
+
 // PRIVATE BOOKINGS SETTINGS
 
 // These settings are all set per area through MRBS.   These are the default
@@ -229,17 +263,17 @@ $private_enabled = FALSE;  // DEFAULT VALUE FOR NEW AREAS
            // the booking private.
 
 $private_mandatory = FALSE;  // DEFAULT VALUE FOR NEW AREAS
-           // If TRUE all new/edited entries will 
+           // If TRUE all new/edited entries will
            // use the value from $private_default when saved.
            // If checkbox is displayed it will be disabled.
-           
+
 $private_default = FALSE;  // DEFAULT VALUE FOR NEW AREAS
            // Set default value for "Private" flag on new/edited entries.
            // Used if the $private_enabled checkbox is displayed
            // or if $private_mandatory is set.
 
 $private_override = "none";  // DEFAULT VALUE FOR NEW AREAS
-           // Override default privacy behavior. 
+           // Override default privacy behavior.
            // "none" - Private flag on entry is used
            // "private" - ALL entries are treated as private regardless
            //             of private flag on the entry.
@@ -249,7 +283,7 @@ $private_override = "none";  // DEFAULT VALUE FOR NEW AREAS
            // Consider your users' expectations of privacy before
            // changing to "public" or from "private" to "none"
 
- 
+
 // SETTINGS FOR APPROVING BOOKINGS - PER-AREA
 
 // These settings control whether bookings made by ordinary users need to be
@@ -271,6 +305,15 @@ $reminders_enabled = TRUE;
 $confirmation_enabled = TRUE;
 
 // The default confirmation status for new bookings.  (TRUE: confirmed, FALSE: tentative)
-// Only used if $confirmation_enabled is TRUE.   If $confirmation_enabled is 
+// Only used if $confirmation_enabled is TRUE.   If $confirmation_enabled is
 // FALSE, then all new bookings are confirmed automatically.
 $confirmed_default = TRUE;
+
+
+/*************
+ * Entry Types
+ *************/
+
+// Default type for new bookings
+// (Note that the default type does not apply if the type field is mandatory)
+$default_type = "I";

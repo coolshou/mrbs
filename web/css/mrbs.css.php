@@ -3,6 +3,7 @@ namespace MRBS;
 
 require_once "../systemdefaults.inc.php";
 require_once "../config.inc.php";
+require_once "../site_config.inc";
 require_once "../functions.inc";
 require_once "../theme.inc";
 
@@ -70,7 +71,7 @@ input, textarea {
 input.date,
 .js input[type="date"],
 input.form-control.input {
-  width: 6.5em;
+  width: 10em;
 }
 
 <?php
@@ -85,10 +86,6 @@ input.form-control.input.flatpickr-mobile {
 
 input.form-control.input {
   text-align: center;
-}
-
-.js input:not(.form-control.input)[type="date"] {
-  visibility: hidden;
 }
 
 input.date {
@@ -123,21 +120,49 @@ h2 {
 }
 
 .minicalendars {
-  margin-right: 2em;
   padding-top: 0.8rem; <?php // same as margin-top on nav.main_calendar ?>
 }
 
 .minicalendars.formed {
+  margin-right: 2em;
   display: none;
 }
 
 @media screen and (min-width: 80rem) {
+
   .minicalendars.formed {
     display: block;
   }
 }
 
 <?php
+if ($display_mincals_above)
+{
+  ?>
+  @media screen and (max-width: 80rem) and (min-width: 30rem) and (min-height: 55rem)  {
+
+    .index :not(.simple) + .contents {
+      flex-direction: column;
+    }
+
+    .minicalendars.formed {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-height: 18em;
+      overflow: hidden;
+      margin-right: 0;
+    }
+
+    .flatpickr-calendar.inline {
+      margin-left: 1.5em;
+      margin-right: 1.5em;
+    }
+
+  }
+  <?php
+}
+
 // Make the inline minicalendars smaller than the pop-up calendars.
 // The default width is 39px
 ?>
@@ -481,6 +506,42 @@ nav.main_calendar > nav {
   justify-content: center;
 }
 
+<?php
+// Only allow the location element to wrap if the parent has already wrapped.
+?>
+nav.main_calendar.wrapped nav.location {
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+}
+
+<?php
+// Change the order if the element has wrapped (detected by JavaScript) in order
+// to make it looker better and improve space utilisation.
+?>
+nav.main_calendar.wrapped nav.location {
+  flex-basis: 100%;
+}
+
+nav.main_calendar.wrapped:nth-of-type(1) nav.location {
+  order: -1;
+}
+
+<?php
+// Put the margins on the children rather than the parent in case they are wrapped,
+// because then we will want some vertical separation between the wrapped items.
+?>
+nav.main_calendar.wrapped:nth-of-type(1) nav.location > * {
+  margin-bottom: 1em;
+}
+
+nav.main_calendar.wrapped:nth-of-type(2) nav.location {
+  order: 1;
+}
+
+nav.main_calendar.wrapped:nth-of-type(2) nav.location > * {
+  margin-top: 1em;
+}
+
 nav.main_calendar > nav:first-child {
   -ms-flex-pack: start;
   justify-content: flex-start;
@@ -788,25 +849,6 @@ table.dwm_main {
   border-top: 1px solid <?php echo $banner_back_color ?>;
 }
 
-.dwm_main > *:last-child tr:last-child th,
-.dwm_main > *:last-child tr:last-child td {
-  border-bottom: 0 solid <?php echo $main_table_border_color ?>;
-}
-
-.dwm_main > *:last-child tr:last-child th {
-  border-top: 0 solid <?php echo $main_table_border_color ?>;
-}
-
-.dwm_main th:first-child,
- .dwm_main td:first-child {
-   border-left: 0 solid <?php echo $main_table_border_color ?>;
-}
-
-.dwm_main th:last-child,
-.dwm_main td:last-child {
-  border-right: 0 solid <?php echo $main_table_border_color ?>;
-}
-
 .dwm_main thead tr:first-child th:first-child {
   border-top-left-radius: 5px;
 }
@@ -979,12 +1021,7 @@ table.dwm_main {
 .dwm_main#month_main td.invalid {
   background-color: <?php echo $main_table_month_invalid_color ?>;
 }
-.dwm_main#month_main td.today   {
-  background-color: <?php echo $show_today_bgcolor // jimmy, today color?>
-}
-.dwm_main#month_main td.holiday   {
-  background-color: <?php echo $show_holiday_bgcolor // jimmy, today color?>
-}
+
 .dwm_main#month_main:not(.all_rooms) a {
   height: 100%;
   width: 100%;
@@ -1061,17 +1098,10 @@ div.cell_header {
   width: auto;
   float: left;
 }
-<?php // jimmy ?>
-#month_main div.cell_header spen.holiday {
-  position: relative;
-  display: block;
-  float: left;
-  color: red;
-}
+
 <?php // the date in the top left corner ?>
 #month_main div.cell_header a.monthday {
   font-size: medium;
-  width: auto;<?php // jimmy ?>
 }
 
 #month_main div.cell_header a.week_number {
@@ -1123,15 +1153,32 @@ if ($clipped_month)
 
 <?php
 // Generate the classes to give the colour coding by booking type in the day/week/month views
+// Don't go for hard stops on the linear gradient because it doesn't do anti-aliasing.  Instead leave
+// a pixel gap to allow the linear gradient to do some blurring.  (Unfortunately calc() doesn't
+// work with linear-gradient in IE11).
 foreach ($color_types as $type => $col)
 {
-  echo ".$type {background-color: $col}\n";
+  echo ".$type {background: $col}\n";
+  echo ".full.$type {background: linear-gradient(to right bottom, $col calc(50% - 1.5px), $row_even_color calc(50% - 0.5px) calc(50% + 0.5px), $col calc(50% + 1.5px))}\n";
+  echo ".spaces.$type {background: linear-gradient(to right bottom, $row_even_color calc(50% - 0.5px), $col calc(50% + 0.5px))}\n";
 }
 
 ?>
 
+.full a,
+.spaces a {
+  background: transparent;
+}
+
+<?php
+// Put a line at the top of the div to separate the rows when the div is below an even row.
+?>
+tbody tr:nth-child(odd) .spaces {
+  box-shadow: 0 1px 0 <?php echo $row_odd_color ?> inset;
+}
+
 .private_type {
-  background-color: <?php echo $main_table_slot_private_type_color;?>;
+  background: <?php echo $main_table_slot_private_type_color;?>;
 }
 
 .dwm_main thead th,
@@ -1365,6 +1412,10 @@ div#div_custom_html {
   margin-left: 1em;
 }
 
+.buttons input {
+  margin-top: 2em;
+}
+
 
 <?php // The standard form ?>
 
@@ -1381,6 +1432,10 @@ div#div_custom_html {
   border-spacing: 0 0.75em;
   border-collapse: separate;
   padding: 1em 1em 1em 0;
+}
+
+.standard#logon fieldset {
+  padding-bottom: 0;
 }
 
 .standard fieldset > div {
@@ -1403,6 +1458,16 @@ div#div_custom_html {
 
 .standard fieldset > div > div > * {
   float: left;
+  margin-top: 0;
+}
+
+.standard ul {
+  clear: left;
+}
+
+.reset_password .standard p {
+  float: left;
+  clear: left;
 }
 
 .standard fieldset fieldset {
@@ -1479,30 +1544,90 @@ div#div_custom_html {
 }
 
 <?php
+// On narrow devices put the form labels above the form inputs, instead
+// of to the left.
+?>
+@media (max-width: 30rem) {
+  .standard fieldset {
+    display: block;
+  }
+
+  .standard fieldset > div {
+    display: block;
+    float: left;
+    clear: left;
+  }
+
+  .standard fieldset div > * {
+    margin-bottom: 1em;
+  }
+
+  .standard fieldset > div > *:not(.none) {
+    display: block;
+    vertical-align: middle;
+  }
+
+  .standard fieldset > div > label {
+    text-align: left;
+    padding-left: 0;
+    padding-right: 0;
+    margin-bottom: 0.2em;
+  }
+
+  .standard fieldset.rep_type_details {
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+
+  .standard input#rep_interval {
+    float: left;
+  }
+
+  .standard div#rep_type div.long {
+    border-right: 0;
+  }
+
+  .standard .submit_buttons > * {
+    float: left;
+  }
+}
+
+<?php
 // The max number of bookings policy fieldset, where we want to display the
 // controls in tabular form
 ?>
 
-#max_number div:first-of-type span, #max_number div div div {
+.standard fieldset.max_limits > div > label {
+  vertical-align: top;
+  margin-bottom: 0.5em;
+}
+
+.max_limits div:first-of-type span {
   display: inline-block;
   width: 50%;
 }
 
-#max_number div:first-of-type span {
+.max_limits div div div {
+  float: left;
+  margin-bottom: 0.5em;
+}
+
+.max_limits div:first-of-type span {
   white-space: normal;
   font-style: italic;
 }
 
-#max_number div div {
+.max_limits div div {
   white-space: nowrap;
 }
 
-#max_number input {
+.max_limits input {
   display: inline-block;
 }
 
-
-
+.max_limits input[type="checkbox"] {
+  margin-right: 1em;
+}
 
 div#rep_type div.long{
   border-right: 1px solid <?php echo $site_faq_entry_border_color ?>;
@@ -1522,7 +1647,8 @@ fieldset.rep_type_details fieldset {
   clear: none;
 }
 
-fieldset#rep_info, fieldset#booking_controls {
+fieldset#rep_info,
+fieldset#booking_controls {
   border-top: 1px solid <?php echo $site_faq_entry_border_color ?>;
   border-radius: 0;
   padding-top: 0.7em;
@@ -1625,6 +1751,7 @@ form#add_new_user {
 }
 
 .banner .logo img {
+  display: block;
   margin: 1em 2em 1em 0;
 }
 
@@ -1769,7 +1896,30 @@ form#show_my_entries input.link[type="submit"] {
   font-weight: normal;
 }
 
+@media (max-width: 30rem) {
+  .banner .logo {
+    display: none;
+  }
+
+  .banner .company {
+    align-items: flex-start;
+  }
+
+  .banner #more_info {
+    display: none;
+  }
+
+  <?php
+  // Save room on the index page by not showing the "Goto" button.  However
+  // it's useful on other pages as a means of returning to the index page.
+  ?>
+  .index #form_nav input[type="submit"] {
+    display: none;
+  }
+}
+
 <?php
+
 // THE COLOR KEY
 //
 // Displays as a grid for those browsers that support it, falling back to a flexbox.  The
@@ -2123,10 +2273,68 @@ div#site_faq_body {
 
 /* ------------ VIEW_ENTRY.PHP ------------------*/
 
-.view_entry #entry td:first-child {
+.view_entry #entry td:first-child,
+.view_entry #registration .list td:first-child {
   text-align: right;
   font-weight: bold;
   padding-right: 1.0em;
+}
+
+.view_entry #registration .list {
+  margin-bottom: 1em;
+}
+
+.view_entry #entry,
+.view_entry #registration {
+  padding-left: 1em;
+}
+
+.view_entry #registration {
+  margin-bottom: 2em;
+}
+
+.view_entry #registration p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.view_entry #registration .standard {
+  display: inline-block;
+  float: none;
+  margin-top: 0;
+}
+
+.view_entry #registration .standard fieldset {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.view_entry #registration .standard fieldset > div > label {
+  padding-left: 0;
+}
+
+.view_entry #registrant_list {
+  padding-left: 1em;
+}
+
+.view_entry #registrants thead th {
+  text-align: left;
+}
+
+.view_entry #registrants th,
+.view_entry #registrants td {
+  vertical-align: middle;
+  padding: 0.4em 0.8em;
+}
+
+.view_entry #registrants td:not(:first-child) {
+  width: 33%;
+}
+
+.view_entry h4 {
+  margin-top: 2em;
+  margin-bottom: 1em;
+  clear: left;
 }
 
 .view_entry div#view_entry_nav {
@@ -2334,6 +2542,17 @@ div#check_tabs {background-image: none}
   box-shadow:-5px 0 0 <?php echo $flatpickr_highlight_color ?>, 5px 0 0 <?php echo $flatpickr_highlight_color ?>;
 }
 
+.flatpickr-day.mrbs-hidden {
+  color: rgba(57,57,57,0.1);
+}
+
+<?php
+// Fix to stop calendars being 1px wide when the screen is widened.
+// See https://github.com/flatpickr/flatpickr/issues/1300
+?>
+.flatpickr-calendar, .flatpickr-days {
+    width: auto !important;
+}
 
 h2.date.loading,
 h2.date.loading::after {
@@ -2342,3 +2561,10 @@ h2.date.loading::after {
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
+
+.ajax-loading input.select2-search__field {
+  background-image: url(../images/ajax-loader.gif);
+  background-position: center right 5px;
+  background-repeat: no-repeat;
+}
+

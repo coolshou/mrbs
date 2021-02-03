@@ -48,8 +48,9 @@ var getTypes = function getTypes(table) {
 
 <?php
 // Turn the table with id 'id' into a DataTable, using specificOptions
-// which are merged with the default options.   If the browser is IE6 or less
-// we don't bother making a dataTable:  it can be done, but it's not worth it.
+// which are merged with the default options.  If the buttons property is
+// set in specificOptions then the first element in the array should be the
+// colvis button and any other elements are extra buttons.
 //
 // fixedColumnsOptions is an optional object that gets passed directly to the
 // DataTables FixedColumns constructor
@@ -110,6 +111,18 @@ function makeDataTable(id, specificOptions, fixedColumnsOptions)
   };
 
   <?php
+  // Make room for any extra buttons after the first button, which is assumed
+  // to be the colvis button.
+  ?>
+  if (specificOptions && specificOptions.buttons)
+  {
+    for (i=0; i<specificOptions.buttons.length - 1; i++)
+    {
+      defaultOptions.buttons.push({});
+    }
+  }
+
+  <?php
   // For all pages except the pending page, which has collapsible rows which don't work well with the
   // buttons, add the Copy/CSV/etc. buttons.
   ?>
@@ -148,18 +161,15 @@ function makeDataTable(id, specificOptions, fixedColumnsOptions)
 
   <?php
   // Set the language file to be used
-  $datatable_dir = '../jquery/datatables/language';
-  if ($lang_file = get_datatable_lang_file($datatable_dir))
+  if ($lang_file = get_datatable_lang_path())
   {
     // If using the language.url way of loading a DataTables language file,
     // then the file must be valid JSON.   The .lang files that can be
     // downloaded from GitHub are not valid JSON as they contain comments.  They
     // therefore cannot be used with language.url, but instead have to be
-    // included directly.   Note that if ever we go back to using the url
-    // method then the '../' would need to be stripped off the pathname, as in
-    //    $lang_file = substr($lang_file, 3); // strip off the '../'
+    // included directly.
     ?>
-    defaultOptions.language = <?php include $datatable_dir . '/' . $lang_file ?>;
+    defaultOptions.language = <?php include "../$lang_file" ?>;
     <?php
   }
   ?>

@@ -22,6 +22,7 @@ $form_vars = array(
   'description'      => 'string',
   'capacity'         => 'int',
   'room_admin_email' => 'string',
+  'invalid_types'    => 'array',
   'custom_html'      => 'string'
 );
 
@@ -39,7 +40,7 @@ foreach($form_vars as $var => $var_type)
 }
 
 // Get the information about the fields in the room table
-$fields = db()->field_info($tbl_room);
+$fields = db()->field_info(_tbl('room'));
 
 // Get any custom fields
 foreach($fields as $field)
@@ -105,18 +106,27 @@ if (!validate_email_list($room_admin_email))
   $errors[] = 'invalid_email';
 }
 
+// Make sure the invalid types exist
+$invalid_types = array_intersect($invalid_types, $booking_types);
+
 if (empty($errors))
 {
   // Used purely for the syntax_casesensitive_equals() call below, and then ignored
   $sql_params = array();
 
   // Acquire a mutex to lock out others who might be deleting the new area
-  if (!db()->mutex_lock($tbl_area))
+  if (!db()->mutex_lock(_tbl('area')))
   {
     fatal_error(get_vocab("failed_to_acquire"));
   }
+
   // Check the new area still exists
-  if (db()->query1("SELECT COUNT(*) FROM $tbl_area WHERE id=? LIMIT 1", array($new_area)) < 1)
+  $sql = "SELECT COUNT(*)
+            FROM " . _tbl('area') . "
+           WHERE id=?
+           LIMIT 1";
+
+  if (db()->query1($sql, array($new_area)) < 1)
   {
     $errors[] = 'invalid_area';
   }
@@ -128,19 +138,19 @@ if (empty($errors))
   //  keep the flow of this elseif block]
   elseif ( (($new_area != $old_area) || ($room_name != $old_room_name))
           && db()->query1("SELECT COUNT(*)
-                             FROM $tbl_room
+                             FROM " . _tbl('room') . "
                             WHERE" . db()->syntax_casesensitive_equals("room_name", $room_name, $sql_params) . "
                               AND area_id=?
                             LIMIT 1", array($room_name, $new_area)) > 0)
   {
     $errors[] = 'invalid_room_name';
   }
-  // If everything is still OK, update the databasae
+  // If everything is still OK, update the database
   else
   {
     // Convert booleans into 0/1 (necessary for PostgreSQL)
     $room_disabled = (!empty($room_disabled)) ? 1 : 0;
-    $sql = "UPDATE $tbl_room SET ";
+    $sql = "UPDATE " . _tbl('room') . " SET ";
     $sql_params = array();
     $assign_array = array();
     foreach ($fields as $field)
@@ -178,6 +188,10 @@ if (empty($errors))
             $assign_array[] = "room_admin_email=?";
             $sql_params[] = $room_admin_email;
             break;
+          case 'invalid_types':
+            $assign_array[] = "invalid_types=?";
+            $sql_params[] = json_encode($invalid_types);
+            break;
           case 'custom_html':
             $assign_array[] = "custom_html=?";
             $sql_params[] = $custom_html;
@@ -212,21 +226,19 @@ if (empty($errors))
     db()->command($sql, $sql_params);
 
     // Release the mutex and go back to the admin page (for the new area)
-    db()->mutex_unlock($tbl_area);
-    header("Location: admin.php?day=$day&month=$month&year=$year&area=$new_area&room=$room");
-    exit();
+    db()->mutex_unlock(_tbl('area'));
+    location_header("admin.php?day=$day&month=$month&year=$year&area=$new_area&room=$room");
   }
 
   // Release the mutex
-  db()->mutex_unlock($tbl_area);
+  db()->mutex_unlock(_tbl('area'));
 }
 
 
 // Go back to the room form with errors
-$query_string = 'room=' . urlencode($room);
+$query_string = "room=$room";
 foreach ($errors as $error)
 {
-  $query_string .= '&errors[]=' . urlencode($error);
+  $query_string .= "&errors[]=$error";
 }
-header("Location: edit_room.php?$query_string");
-exit;
+location_header("edit_room.php?$query_string");
