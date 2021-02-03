@@ -1021,7 +1021,12 @@ table.dwm_main {
 .dwm_main#month_main td.invalid {
   background-color: <?php echo $main_table_month_invalid_color ?>;
 }
-
+.dwm_main#month_main td.today   {
+  background-color: <?php echo $show_today_bgcolor // jimmy, today color?>
+}
+.dwm_main#month_main td.holiday   {
+  background-color: <?php echo $show_holiday_bgcolor // jimmy, today color?>
+}
 .dwm_main#month_main:not(.all_rooms) a {
   height: 100%;
   width: 100%;
@@ -1098,10 +1103,17 @@ div.cell_header {
   width: auto;
   float: left;
 }
-
+<?php // jimmy ?>
+#month_main div.cell_header spen.holiday {
+  position: relative;
+  display: block;
+  float: left;
+  color: red;
+}
 <?php // the date in the top left corner ?>
 #month_main div.cell_header a.monthday {
   font-size: medium;
+  width: auto;<?php // jimmy ?>
 }
 
 #month_main div.cell_header a.week_number {

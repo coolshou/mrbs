@@ -1691,7 +1691,16 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
   {
     $html .= get_blank_day($weekcol);
   }
+//jimmy
+  global $show_holiday ;
+  $holidays = get_holidays($year);
 
+  global $show_today;
+  $datetime = new DateTime();
+  $thisyear = $datetime->format('Y');
+  $thismonth = $datetime->format('m');
+  $today = $datetime->format('d');
+  // jimmy -end
   // Get the data.  It's much quicker to do a single SQL query getting all the
   // entries for the interval in one go, rather than doing a query for each day.
   $entries = get_entries_by_room($room,
@@ -1727,7 +1736,29 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
     }
     else
     {
-      $html .= "<td class=\"valid\">\n";
+      //jimmy
+      $td_class = "valid";
+      if ($show_holiday){
+          $search_text = date("Y-m-d", strtotime($year."-".$month."-".$d));
+          $hidx = False;
+          foreach ($holidays as $value){
+              $hidx = stripos($value, $search_text);
+             if($hidx !== False){
+                 $hdays = explode(",", $value);
+                break;
+            }
+          }
+        if  ($hidx !== False) {
+            $td_class = "holiday";
+        }
+      }
+      if ($show_today){
+        if (($year == $thisyear) and ($month == $thismonth) and ($d == $today)){
+          $td_class = "today";
+        }
+	  }
+      $html .= "<td class=\"$td_class\">\n";
+      // jimmy -end
       $html .= "<div class=\"cell_container\">\n";
 
       $html .= "<div class=\"cell_header\">\n";
@@ -1751,7 +1782,13 @@ function month_room_table_innerhtml($view, $view_all, $year, $month, $day, $area
       $vars['view'] = 'day';
       $query = http_build_query($vars, '', '&');
       $html .= '<a class="monthday" href="' . htmlspecialchars(multisite("index.php?$query")) . "\">$d</a>\n";
-
+      //jimmy
+      if ($show_holiday){
+          if  ($hidx !== False) {
+            $html .= "<spen class=\"holiday\">$hdays[1]</spen>\n";
+          }
+      }
+      // jimmy, end show_holiday
       $html .= "</div>\n";
 
       // then the link to make a new booking

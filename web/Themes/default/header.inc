@@ -211,7 +211,12 @@ function print_menu_items($query)
   {
     $menu_items['user_list'] = 'edit_users.php';
   }
-
+  //jimmy
+  global $show_holiday;
+  if  ($show_holiday){
+    $menu_items['holiday'] = 'holiday.php';
+  }
+  // jimmy end
   foreach ($menu_items as $token => $page)
   {
     // Only print menu items for which the user is allowed to access the page

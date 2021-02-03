@@ -2533,3 +2533,53 @@ function get_bookings_in_series($repeat_id)
 
   return $bookings;
 }
+
+//jimmy
+function get_holidays($year){
+    /*get holidays of the $year*/
+    //TODO:  get this year's holiday, ID=1 (Taiwan)
+    $holidays = array();
+    //$holiday = array();
+    //$sql = "SELECT Date,Name FROM `mrbs_holiday` WHERE YEAR(Date) = YEAR(CURDATE()) ";
+    $sql = "SELECT Date,Name FROM `mrbs_holiday` WHERE YEAR(Date) = $year";
+    $res = db()->query($sql);
+    while (false !== ($row = $res->next_row_keyed()))
+    {
+        //$holiday['Date'] = $row['Date'];
+        //$holiday['Name'] = $row['Name'];
+        //echo "date: $row['Date'] <br/>";
+        array_push($holidays, $row['Date'].",".$row['Name']);
+        //array_push($holidays, $holiday);
+    }
+    /*
+    foreach ($holidays as $value)
+        {
+            //echo "$value ";
+            foreach ($arr as $key => $value){
+                echo("$key : $value <br>");
+            }
+        }*/
+    return $holidays;
+}
+function get_holidays_location($all=FALSE)
+{
+  global $tbl_area;
+
+  $areas = array();
+
+  $sql = "SELECT id, area_name FROM $tbl_area";
+  if (empty($all))
+  {
+    $sql .= " WHERE disabled=0";
+  }
+  $sql .= " ORDER BY sort_key";
+
+  $res = db()->query($sql);
+
+  while (false !== ($row = $res->next_row_keyed()))
+  {
+    $areas[$row['id']] = $row['area_name'];
+  }
+
+  return $areas;
+}
