@@ -21,7 +21,7 @@ $wrapper_mime_types = array('file'            => 'text/calendar',
                             'compress.zlib'   => 'application/x-gzip',
                             'compress.bzip2'  => 'application/x-bzip2');
 
-$wrapper_descriptions = array('file'            => get_vocab('import_text_file'),
+$wrapper_descriptions = array('file'            => get_vocab('import_holiday_text_file'),
                               'zip'             => get_vocab('import_zip'),
                               'compress.zlib'   => get_vocab('import_gzip'),
                               'compress.bzip2'  => get_vocab('import_bzip2'));
@@ -625,7 +625,46 @@ function get_archive_details($file)
   return $result;
 }
 
+function get_fieldset_holiday_location_settings()
+{
 
+  $fieldset = new ElementFieldset();
+  //$fieldset->addLegend(get_vocab('holiday_location_settings'));
+
+    // Default Country
+    $areas = get_area_names($all=true);
+  if (count($areas) > 0)
+  {
+    $options = array();
+
+    foreach($areas as $area_id => $area_name)
+    {
+      $rooms = get_room_names($area_id, $all=true);
+      if (count($rooms) > 0)
+      {
+        $options[$area_name] = array();
+        foreach($rooms as $room_id => $room_name)
+        {
+          $options[$area_name][$room_id] = $room_name;
+        }
+      }
+    }
+    if (count($options) > 0)
+        {
+          $field = new FieldSelect();
+
+          $field->setLabel(get_vocab('holiday_location_settings'))
+                ->setLabelAttribute('title', get_vocab('default_room_note'))
+                ->setControlAttribute('name', 'import_default_room')
+                ->addSelectOptions($options, $default_room, true);
+
+          $fieldset->addElement($field);
+        }
+  }
+
+
+  return $fieldset;
+}
 function get_fieldset_location_settings()
 {
   global $default_room;
@@ -848,11 +887,11 @@ if (!empty($import))
 // PHASE 1 - Get the user input
 // ----------------------------
 
-echo "<h2>" . get_vocab('import_icalendar') . "</h2>\n";
+echo "<h2>" . get_vocab('import_holiday') . "</h2>\n";
 
 $compression_wrappers = get_compression_wrappers();
 
-echo "<p>\n" . get_vocab('import_intro') . "</p>\n";
+echo "<p>\n" . get_vocab('import_holiday_intro') . "</p>\n";
 echo "<p>\n" . get_vocab('supported_file_types') . "</p>\n";
 echo "<ul>\n";
 echo "<li>" . $wrapper_descriptions['file'] . "</li>\n";
@@ -888,9 +927,10 @@ $field->setLabel(get_vocab('file_name'))
                                    'id'     => 'upload_file'));
 
 $fieldset->addElement($field)
-         ->addElement(get_fieldset_location_settings())
-         ->addElement(get_fieldset_other_settings())
+         ->addElement(get_fieldset_holiday_location_settings())
          ->addElement(get_fieldset_submit_button());
+         //->addElement(get_fieldset_other_settings())
+
 
 $form->addElement($fieldset);
 
